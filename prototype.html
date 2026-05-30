@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>STARDUST · 별의 자취</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          night: { 900: '#0B0F19', 800: '#121829', 700: '#1A2333', 600: '#222d44' },
+          warm: '#FFF6D6',
+          dawn: '#D2E6FF',
+          aurora1: '#A1C4FD',
+          aurora2: '#C2E9FB',
+        },
+        fontFamily: {
+          sans: ['Pretendard', 'system-ui', 'sans-serif'],
+          serif: ['"Playfair Display"', 'serif'],
+        },
+      },
+    },
+  };
+</script>
+<style>
+  body { background:#05070d; }
+  .glass {
+    background: rgba(26,35,51,0.55);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(210,230,255,0.12);
+  }
+  .glass-soft {
+    background: rgba(18,24,41,0.5);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(210,230,255,0.08);
+  }
+  /* 소울 요정 호흡 애니메이션 */
+  @keyframes breathe {
+    0%,100% { transform: scale(1); opacity:.85; filter:blur(0px); }
+    50% { transform: scale(1.18); opacity:1; filter:blur(.4px); }
+  }
+  .breathe { animation: breathe 3.4s ease-in-out infinite; }
+  @keyframes haloPulse {
+    0% { transform: scale(.6); opacity:.55; }
+    100% { transform: scale(2.6); opacity:0; }
+  }
+  .halo { animation: haloPulse 3.4s ease-out infinite; }
+  @keyframes twinkle {
+    0%,100% { opacity:.25; }
+    50% { opacity:1; }
+  }
+  .twinkle { animation: twinkle 4s ease-in-out infinite; }
+  @keyframes floatY {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-7px); }
+  }
+  .floaty { animation: floatY 5s ease-in-out infinite; }
+  @keyframes focusRing {
+    0%,100% { transform: scale(1); opacity:.7; }
+    50% { transform: scale(1.06); opacity:1; }
+  }
+  .focus-ring { animation: focusRing 2.6s ease-in-out infinite; }
+  /* 화면 전환 */
+  .screen { transition: opacity 900ms ease-in-out, transform 900ms ease-in-out; }
+  .screen-hidden { opacity:0; pointer-events:none; transform: scale(1.03); }
+  .ripple { transition: all 1100ms cubic-bezier(.4,0,.2,1); }
+  /* 지도 격자 배경 */
+  .topo {
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(161,196,253,0.10), transparent 38%),
+      radial-gradient(circle at 78% 68%, rgba(194,233,251,0.08), transparent 42%),
+      linear-gradient(rgba(210,230,255,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(210,230,255,0.05) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 44px 44px, 44px 44px;
+  }
+  .no-scrollbar::-webkit-scrollbar { display:none; }
+  .no-scrollbar { -ms-overflow-style:none; scrollbar-width:none; }
+  .tracking-widest-2 { letter-spacing:.32em; }
+  /* 배경 별 은은한 흐름 */
+  @keyframes drift {
+    0%   { transform: translate(0,0); }
+    50%  { transform: translate(var(--dx,4px), var(--dy,-6px)); }
+    100% { transform: translate(0,0); }
+  }
+  /* 하늘 마주하기 버튼 → 중앙 빛 맥박 */
+  @keyframes pulseGlow {
+    0%   { transform: scale(1); }
+    35%  { transform: scale(1.5); }
+    65%  { transform: scale(.9); }
+    100% { transform: scale(1); }
+  }
+  .pulse-glow { animation: pulseGlow 820ms cubic-bezier(.34,1.56,.64,1); }
+  @keyframes ringBurst {
+    0%   { transform: scale(.5); opacity:.7; }
+    100% { transform: scale(3.4); opacity:0; }
+  }
+  .ring-burst { animation: ringBurst 820ms ease-out; }
+</style>
+</head>
+<body class="font-sans text-dawn antialiased">
+
+<!-- 앱 외곽 / 데스크탑 안내 -->
+<div class="min-h-screen w-full flex flex-col items-center justify-center py-8 px-4"
+     style="background: radial-gradient(1200px 600px at 50% -10%, #15203a 0%, #0B0F19 55%, #05070d 100%);">
+
+  <!-- 상단 브랜드 -->
+  <div class="text-center mb-6 select-none">
+    <h1 class="font-serif text-2xl text-warm tracking-wide">STARDUST</h1>
+    <p class="text-[11px] text-dawn/50 mt-1 tracking-widest-2">당신이 머문 자리마다 별이 뜹니다</p>
+  </div>
+
+  <!-- 모바일 프레임 -->
+  <div class="relative w-[390px] h-[800px] rounded-[44px] p-[10px] shadow-2xl"
+       style="background:linear-gradient(160deg,#2a3650,#0d1320); box-shadow:0 40px 120px -20px rgba(80,120,200,.35), 0 0 0 1px rgba(210,230,255,.06);">
+    <div class="relative w-full h-full rounded-[36px] overflow-hidden bg-night-900">
+
+      <!-- 노치 -->
+      <div class="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-black rounded-b-2xl z-50"></div>
+
+      <!-- ============ 화면 1: STAR MAP (홈) ============ -->
+      <section id="screen-map" class="screen absolute inset-0">
+        <!-- 지도 영역 (실제 지도 SDK 삽입 위치) -->
+        <div id="mapArea" class="topo absolute inset-0 bg-night-900 overflow-hidden">
+          <!-- 배경 별 -->
+          <div id="mapStars" class="absolute inset-0"></div>
+
+          <!-- 손가락 경로 → 별자리/오로라 시각화 캔버스 -->
+          <canvas id="drawCanvas" class="absolute inset-0 w-full h-full" style="pointer-events:none;"></canvas>
+
+          <!-- 동선 트레일 (지나온 길) -->
+          <svg class="absolute inset-0 w-full h-full" viewBox="0 0 390 800" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="trailGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#FFF6D6" stop-opacity=".9"/>
+                <stop offset="55%" stop-color="#A1C4FD" stop-opacity=".8"/>
+                <stop offset="100%" stop-color="#C2E9FB" stop-opacity=".7"/>
+              </linearGradient>
+            </defs>
+            <path d="M 70 600 Q 120 520 175 470 T 250 330 Q 290 270 300 190"
+                  fill="none" stroke="url(#trailGrad)" stroke-width="2.5"
+                  stroke-dasharray="2 7" stroke-linecap="round" opacity=".75"/>
+          </svg>
+
+          <!-- 관광 스팟 핀들 (한국관광공사 API 매핑) -->
+          <!-- 방문 완료 스팟 (별 생성됨) -->
+          <button class="spot absolute" style="left:62px; top:585px;" data-name="경포대 도립공원" data-region="강원도 강릉시" data-dist="visited">
+            <span class="block w-3 h-3 rounded-full bg-warm shadow-[0_0_12px_4px_rgba(255,246,214,.7)] twinkle"></span>
+          </button>
+          <button class="spot absolute" style="left:167px; top:455px;" data-name="강문해변 솟대" data-region="강원도 강릉시" data-dist="visited">
+            <span class="block w-3 h-3 rounded-full bg-aurora2 shadow-[0_0_12px_4px_rgba(194,233,251,.7)] twinkle" style="animation-delay:1s"></span>
+          </button>
+
+          <!-- 미방문 정화 스팟 (목표) -->
+          <button class="spot absolute group" style="left:288px; top:178px;" data-name="강릉 안목해변 커피거리" data-region="강원도 강릉시" data-dist="450">
+            <span class="absolute -inset-3 rounded-full border border-aurora1/40 focus-ring"></span>
+            <span class="block w-4 h-4 rounded-full border-2 border-aurora1 bg-aurora1/20"></span>
+          </button>
+          <button class="spot absolute group" style="left:120px; top:250px;" data-name="평창 발왕산 케이블카" data-region="강원도 평창군" data-dist="2300">
+            <span class="block w-3.5 h-3.5 rounded-full border-2 border-dawn/50 bg-dawn/10"></span>
+          </button>
+          <button class="spot absolute group" style="left:300px; top:560px;" data-name="속초 영금정 해돋이" data-region="강원도 속초시" data-dist="3100">
+            <span class="block w-3.5 h-3.5 rounded-full border-2 border-dawn/50 bg-dawn/10"></span>
+          </button>
+
+          <!-- 소울 요정 아바타 (현재 위치) -->
+          <div class="absolute" style="left:175px; top:470px; transform:translate(-50%,-50%);">
+            <span class="absolute inset-0 -m-2 rounded-full bg-aurora1/30 halo"></span>
+            <span id="soulBurst" class="absolute inset-0 -m-2 rounded-full border border-aurora2/70 opacity-0"></span>
+            <div id="soulFairy" class="breathe relative w-7 h-7 rounded-full"
+                 style="background:radial-gradient(circle at 35% 30%, #FFFFFF, #D2E6FF 40%, #A1C4FD 80%); box-shadow:0 0 24px 8px rgba(161,196,253,.6);"></div>
+          </div>
+        </div>
+
+        <!-- 상단 상태바 -->
+        <div class="absolute top-0 left-0 right-0 pt-9 px-5 flex items-start justify-between z-20">
+          <div class="glass-soft rounded-2xl px-3.5 py-2">
+            <p class="text-[10px] text-dawn/50 tracking-wide">지금 머무는 곳</p>
+            <p class="text-sm text-warm font-medium flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-5.2-7-11a7 7 0 1 1 14 0c0 5.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+              강릉 강문해변
+            </p>
+          </div>
+          <div class="glass-soft rounded-2xl px-3.5 py-2 text-right">
+            <p class="text-[10px] text-dawn/50">오늘의 자취</p>
+            <p class="text-sm text-warm font-medium">별 7 · 1.2km</p>
+          </div>
+        </div>
+
+        <!-- 경로 그리기 토글 -->
+        <button id="drawToggle" onclick="toggleDraw()"
+                class="absolute top-[88px] right-5 z-30 glass-soft rounded-full pl-3 pr-3.5 py-2 flex items-center gap-2 active:scale-95 transition">
+          <svg class="w-3.5 h-3.5 text-aurora1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 21s4-9 9-9 9-9 9-9"/><circle cx="3" cy="21" r="1.4" fill="currentColor"/></svg>
+          <span id="drawToggleLabel" class="text-[11px] text-dawn/80">경로 그리기</span>
+        </button>
+
+        <!-- 그리기 안내 -->
+        <div id="drawHint" class="absolute top-[140px] left-1/2 -translate-x-1/2 z-20 hidden">
+          <div class="glass rounded-full px-4 py-1.5">
+            <p class="text-[11px] text-warm">✦ 지도를 손가락(또는 마우스)으로 따라 그려보세요</p>
+          </div>
+        </div>
+
+        <!-- 근처 스팟 알림 배너 -->
+        <div class="absolute top-28 left-1/2 -translate-x-1/2 z-20 floaty">
+          <div class="glass rounded-full pl-3 pr-4 py-2 flex items-center gap-2.5 shadow-lg">
+            <span class="w-2 h-2 rounded-full bg-aurora1 animate-ping"></span>
+            <p class="text-xs text-dawn/90"><b class="text-warm">안목해변</b> 정화 스팟 450m 앞</p>
+          </div>
+        </div>
+
+        <!-- 선택된 스팟 카드 -->
+        <div id="spotCard" class="absolute left-4 right-4 bottom-32 z-30 translate-y-4 opacity-0 pointer-events-none transition-all duration-500">
+          <div class="glass rounded-3xl p-4 shadow-2xl">
+            <div class="flex items-start justify-between">
+              <div>
+                <p id="spotRegion" class="text-[11px] text-aurora1 tracking-wide">강원도 강릉시</p>
+                <h3 id="spotName" class="text-lg text-warm font-medium mt-0.5 font-serif">안목해변 커피거리</h3>
+              </div>
+              <span id="spotDist" class="text-xs text-dawn/60 mt-1 whitespace-nowrap">450m</span>
+            </div>
+            <p class="text-xs text-dawn/55 mt-2 leading-relaxed">한국관광공사 위치기반 관광정보 · 반경 1km 이내 매핑된 정화 스팟입니다.</p>
+          </div>
+        </div>
+
+        <!-- 하단 플로팅 액션 -->
+        <div class="absolute bottom-0 left-0 right-0 pb-7 flex flex-col items-center gap-4 z-30">
+          <button onclick="skyButtonPress()"
+                  class="group relative w-[72px] h-[72px] rounded-full glass flex flex-col items-center justify-center active:scale-95 transition-transform"
+                  style="box-shadow:0 8px 40px -6px rgba(161,196,253,.55);">
+            <span class="absolute inset-0 rounded-full border border-aurora2/40 focus-ring"></span>
+            <svg class="w-6 h-6 text-warm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <path d="M12 19V5"/><path d="m5 12 7-7 7 7"/>
+              <path d="M17.5 17.5a5.5 5.5 0 0 1-11 0" opacity=".5"/>
+            </svg>
+          </button>
+          <p class="text-[11px] text-dawn/60 tracking-widest-2 -mt-1">하늘 마주하기</p>
+
+          <!-- 탭 바 -->
+          <div class="glass-soft rounded-full px-2 py-1.5 flex items-center gap-1 mt-1">
+            <span class="px-4 py-2 rounded-full bg-dawn/10 text-warm text-xs">지도</span>
+            <button onclick="openGalaxy()" class="px-4 py-2 rounded-full text-dawn/55 text-xs hover:text-dawn transition">은하수</button>
+            <span class="px-4 py-2 rounded-full text-dawn/55 text-xs">기록</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 화면 2: SKY CAPTURE (정화 미션) ============ -->
+      <section id="screen-capture" class="screen screen-hidden absolute inset-0 z-40">
+        <!-- 카메라 뷰 (하늘 그라데이션) -->
+        <div class="absolute inset-0" style="background:linear-gradient(180deg,#2d3e63 0%,#5b7bb0 35%,#9bb8e0 70%,#dfe9f7 100%);"></div>
+        <!-- 구름 -->
+        <div class="absolute top-1/3 -left-10 w-48 h-20 bg-white/30 blur-2xl rounded-full floaty"></div>
+        <div class="absolute top-1/2 right-0 w-40 h-16 bg-white/25 blur-2xl rounded-full floaty" style="animation-delay:2s"></div>
+
+        <!-- 상단 안내 -->
+        <div class="absolute top-0 left-0 right-0 pt-12 px-6 text-center z-10">
+          <button onclick="closeCapture()" class="absolute left-5 top-12 w-9 h-9 rounded-full glass-soft flex items-center justify-center">
+            <svg class="w-4 h-4 text-white/80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+          <p class="font-serif text-white text-lg leading-relaxed mt-1 drop-shadow">숨을 크게 들이쉬고,<br/>지금 이 순간의 하늘을 담아보세요.</p>
+        </div>
+
+        <!-- 포커스 링 -->
+        <div class="absolute left-1/2 top-[44%] -translate-x-1/2 -translate-y-1/2 z-10">
+          <div class="focus-ring w-56 h-56 rounded-full border border-white/60 flex items-center justify-center">
+            <div class="w-44 h-44 rounded-full border border-white/30"></div>
+          </div>
+          <div class="absolute inset-0 flex items-center justify-center">
+            <div class="w-1.5 h-1.5 rounded-full bg-white/90"></div>
+          </div>
+        </div>
+
+        <!-- 진행중 분석 오버레이 -->
+        <div id="analyzeBox" class="absolute left-1/2 top-[44%] -translate-x-1/2 -translate-y-1/2 z-20 hidden">
+          <div class="glass rounded-3xl px-6 py-5 text-center">
+            <div class="w-10 h-10 mx-auto rounded-full border-2 border-white/30 border-t-warm animate-spin"></div>
+            <p class="text-white/90 text-sm mt-3">하늘빛을 정화하는 중…</p>
+          </div>
+        </div>
+
+        <!-- 하단 셔터 -->
+        <div class="absolute bottom-0 left-0 right-0 pb-12 flex flex-col items-center gap-5 z-10">
+          <p class="text-white/70 text-xs">갤러리에서 하늘 사진을 불러오거나, 화면을 눌러 촬영하세요</p>
+          <div class="flex items-center gap-8">
+            <!-- 갤러리 업로드 -->
+            <label class="w-11 h-11 rounded-2xl glass-soft flex items-center justify-center cursor-pointer active:scale-95 transition">
+              <input type="file" accept="image/*" class="hidden" onchange="handleUpload(event)" />
+              <svg class="w-5 h-5 text-white/85" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+            </label>
+            <!-- 셔터 버튼 -->
+            <button onclick="capturePhoto()" class="w-[78px] h-[78px] rounded-full bg-white/90 flex items-center justify-center active:scale-95 transition shadow-2xl">
+              <span class="w-[66px] h-[66px] rounded-full border-2 border-night-900/30"></span>
+            </button>
+            <div class="w-11 h-11"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 화면 2.5: 정화 결과 팝업 ============ -->
+      <section id="screen-result" class="screen screen-hidden absolute inset-0 z-50 flex items-center justify-center px-6"
+               style="background:rgba(5,7,13,.78); backdrop-filter:blur(8px);">
+        <div class="glass rounded-[32px] p-7 w-full text-center shadow-2xl">
+          <p class="text-[11px] text-aurora1 tracking-widest-2">SKY PURIFIED</p>
+          <h3 class="font-serif text-warm text-xl mt-2">하나의 별이 태어났습니다</h3>
+
+          <!-- 정화된 하늘 미리보기 + 추출 색 -->
+          <div class="relative mx-auto mt-5 w-40 h-40">
+            <div id="resultSky" class="w-full h-full rounded-3xl overflow-hidden"
+                 style="background:linear-gradient(180deg,#5b7bb0,#9bb8e0,#dfe9f7);">
+              <img id="resultImg" class="w-full h-full object-cover hidden" alt="sky"/>
+            </div>
+            <!-- 새 별 -->
+            <div class="absolute -top-2 -right-2 w-8 h-8 rounded-full twinkle"
+                 id="resultStar" style="background:radial-gradient(circle,#fff,#A1C4FD); box-shadow:0 0 20px 6px rgba(161,196,253,.7);"></div>
+          </div>
+
+          <!-- 추출된 감정 색 -->
+          <div class="mt-5 flex items-center justify-center gap-2.5">
+            <span class="text-xs text-dawn/55">오늘의 하늘빛</span>
+            <span id="hexSwatch" class="w-5 h-5 rounded-full border border-white/30" style="background:#A1C4FD;"></span>
+            <span id="hexCode" class="text-sm text-warm font-mono">#A1C4FD</span>
+          </div>
+
+          <p class="text-xs text-dawn/50 mt-4 leading-relaxed">강릉 안목해변 좌표에<br/>당신의 자취가 별로 기록되었습니다.</p>
+
+          <div class="mt-6 flex gap-3">
+            <button onclick="closeResult()" class="flex-1 py-3 rounded-2xl glass-soft text-dawn/80 text-sm active:scale-95 transition">지도로</button>
+            <button onclick="closeResult(); openGalaxy();" class="flex-1 py-3 rounded-2xl text-night-900 text-sm font-medium active:scale-95 transition"
+                    style="background:linear-gradient(120deg,#FFF6D6,#C2E9FB);">은하수 보기</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 화면 3: MY GALAXY (은하수 시각화) ============ -->
+      <section id="screen-galaxy" class="screen screen-hidden absolute inset-0 z-40 bg-night-900">
+        <canvas id="galaxyCanvas" class="absolute inset-0 w-full h-full"></canvas>
+
+        <!-- 상단 -->
+        <div class="absolute top-0 left-0 right-0 pt-12 px-6 flex items-center justify-between z-10">
+          <button onclick="closeGalaxy()" class="w-9 h-9 rounded-full glass-soft flex items-center justify-center">
+            <svg class="w-4 h-4 text-dawn/80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+          <div class="text-center">
+            <p class="text-[10px] text-dawn/45 tracking-widest-2">MY GALAXY</p>
+          </div>
+          <button id="modeBtn" onclick="cycleMode()" class="px-3 h-9 rounded-full glass-soft flex items-center gap-1.5 text-xs text-dawn/80">
+            <span id="modeLabel">별자리</span>
+          </button>
+        </div>
+
+        <!-- 중앙 타이틀 -->
+        <div class="absolute top-24 left-0 right-0 text-center z-10 pointer-events-none">
+          <h2 class="font-serif text-warm text-xl">강릉을 수놓은 영혼의 자리</h2>
+          <p class="text-xs text-dawn/50 mt-1">2026.05.30 · 총 34개의 별</p>
+        </div>
+
+        <!-- 하단 안내 + 자이로 -->
+        <div class="absolute bottom-0 left-0 right-0 pb-9 flex flex-col items-center gap-4 z-10">
+          <div class="glass-soft rounded-full px-4 py-2 flex items-center gap-2">
+            <svg class="w-3.5 h-3.5 text-aurora1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 2v10l6 3"/></svg>
+            <p class="text-[11px] text-dawn/65">기기를 기울이면 별자리가 입체로 흐릅니다</p>
+          </div>
+          <div class="flex items-center gap-1 glass-soft rounded-full px-2 py-1.5">
+            <span class="px-4 py-2 rounded-full text-dawn/55 text-xs" onclick="closeGalaxy()">지도</span>
+            <span class="px-4 py-2 rounded-full bg-dawn/10 text-warm text-xs">은하수</span>
+            <span class="px-4 py-2 rounded-full text-dawn/55 text-xs">기록</span>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- 하단 캡션 -->
+  <p class="text-[11px] text-dawn/35 mt-6 text-center max-w-md leading-relaxed">
+    2026 관광데이터 활용 공모전 · 웹/앱 개발 부문 프로토타입 &nbsp;|&nbsp; 한국관광공사 OpenAPI · 강원도 특화<br/>
+    버튼을 눌러 <b class="text-dawn/55">하늘 마주하기 → 정화 미션 → 은하수 시각화</b> 흐름을 체험해 보세요.
+  </p>
+</div>
+
+<script>
+/* ---------- 화면 전환 헬퍼 ---------- */
+const show = id => document.getElementById(id).classList.remove('screen-hidden');
+const hide = id => document.getElementById(id).classList.add('screen-hidden');
+
+function openCapture(){ show('screen-capture'); }
+function closeCapture(){ hide('screen-capture'); }
+function closeResult(){ hide('screen-result'); }
+
+/* ---------- 하늘 마주하기 버튼: 중앙 빛 맥박 ---------- */
+function skyButtonPress(){
+  const fairy = document.getElementById('soulFairy');
+  const burst = document.getElementById('soulBurst');
+  fairy.classList.remove('pulse-glow'); void fairy.offsetWidth; fairy.classList.add('pulse-glow');
+  burst.classList.remove('ring-burst'); void burst.offsetWidth;
+  burst.style.opacity = 1; burst.classList.add('ring-burst');
+  setTimeout(()=>{ burst.style.opacity = 0; }, 820);
+  setTimeout(openCapture, 720);
+}
+
+/* ---------- 지도 배경 별 생성 ---------- */
+(function seedMapStars(){
+  const box = document.getElementById('mapStars');
+  let html = '';
+  for(let i=0;i<58;i++){
+    const x=Math.random()*100, y=Math.random()*100, s=Math.random()*1.8+0.6, d=Math.random()*4;
+    const tw=3+Math.random()*3, dr=14+Math.random()*16;            // 흐름 주기 14~30s
+    const dx=(Math.random()*2-1)*9, dy=(Math.random()*2-1)*9;       // 미세 이동량
+    const big = s>1.8;
+    html += `<span style="position:absolute;left:${x}%;top:${y}%;width:${s}px;height:${s}px;`
+          + `--dx:${dx}px;--dy:${dy}px;border-radius:9999px;background:#D2E6FF;`
+          + `opacity:.5;${big?'box-shadow:0 0 6px 1px rgba(210,230,255,.5);':''}`
+          + `animation:twinkle ${tw}s ease-in-out ${d}s infinite, drift ${dr}s ease-in-out ${d}s infinite;"></span>`;
+  }
+  box.innerHTML = html;
+})();
+
+/* ---------- 스팟 선택 카드 ---------- */
+const card = document.getElementById('spotCard');
+document.querySelectorAll('.spot').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.getElementById('spotName').textContent = btn.dataset.name;
+    document.getElementById('spotRegion').textContent = btn.dataset.region;
+    const d = btn.dataset.dist;
+    document.getElementById('spotDist').textContent = d==='visited' ? '✦ 정화 완료' : (d>=1000? (d/1000).toFixed(1)+'km' : d+'m');
+    card.classList.remove('translate-y-4','opacity-0','pointer-events-none');
+    clearTimeout(window._cardT);
+    window._cardT = setTimeout(()=>card.classList.add('translate-y-4','opacity-0','pointer-events-none'), 3200);
+  });
+});
+
+/* ---------- 지도 위 경로 그리기 → 별자리 + 오로라 물결 ---------- */
+const drawCv = document.getElementById('drawCanvas');
+const dctx = drawCv.getContext('2d');
+let drawMode = false, drawing = false, dpath = [], waves = [], dT = 0, dRaf = null;
+let dW = 0, dH = 0, dDpr = 1;
+const AURORA = ['#A1C4FD','#C2E9FB','#8FB3E8','#FFF6D6','#B5D0F5'];
+
+function sizeDrawCanvas(){
+  dDpr = window.devicePixelRatio || 1;
+  dW = drawCv.clientWidth; dH = drawCv.clientHeight;
+  drawCv.width = dW*dDpr; drawCv.height = dH*dDpr;
+  dctx.setTransform(dDpr,0,0,dDpr,0,0);
+}
+
+function toggleDraw(){
+  drawMode = !drawMode;
+  drawCv.style.pointerEvents = drawMode ? 'auto' : 'none';
+  drawCv.style.cursor = drawMode ? 'crosshair' : 'default';
+  document.getElementById('drawToggle').classList.toggle('bg-aurora1/15', drawMode);
+  document.getElementById('drawToggleLabel').textContent = drawMode ? '그리는 중 · 탭하면 종료' : '경로 그리기';
+  document.getElementById('drawHint').classList.toggle('hidden', !drawMode);
+  if(drawMode){
+    sizeDrawCanvas();
+    if(!dRaf) renderDraw();
+  } else {
+    dpath = []; waves = [];
+    cancelAnimationFrame(dRaf); dRaf = null;
+    dctx.clearRect(0,0,dW,dH);
+  }
+}
+
+function ptFromEvent(e){
+  const r = drawCv.getBoundingClientRect();
+  const src = e.touches ? e.touches[0] : e;
+  return { x: src.clientX - r.left, y: src.clientY - r.top };
+}
+function addPoint(p){
+  const last = dpath[dpath.length-1];
+  if(!last || Math.hypot(p.x-last.x, p.y-last.y) > 14){
+    p.hex = AURORA[dpath.length % AURORA.length];
+    p.born = dT;
+    dpath.push(p);
+    if(dpath.length % 2 === 0) waves.push({ x:p.x, y:p.y, r:6, born:dT });
+  }
+}
+function startDraw(e){ if(!drawMode) return; e.preventDefault(); drawing=true; dpath=[]; waves=[]; addPoint(ptFromEvent(e)); }
+function moveDraw(e){ if(!drawMode||!drawing) return; e.preventDefault(); addPoint(ptFromEvent(e)); }
+function endDraw(){ drawing=false; }
+
+drawCv.addEventListener('mousedown', startDraw);
+drawCv.addEventListener('mousemove', moveDraw);
+window.addEventListener('mouseup', endDraw);
+drawCv.addEventListener('touchstart', startDraw, {passive:false});
+drawCv.addEventListener('touchmove', moveDraw, {passive:false});
+drawCv.addEventListener('touchend', endDraw);
+
+function renderDraw(){
+  dT += 0.016;
+  dctx.clearRect(0,0,dW,dH);
+
+  // 1) 오로라 빛 물결: 경로 주변으로 퍼지는 부드러운 링
+  waves = waves.filter(w => dT - w.born < 2.4);
+  waves.forEach(w=>{
+    const age = dT - w.born;
+    const rad = 6 + age*46;
+    const alpha = Math.max(0, 0.28*(1 - age/2.4));
+    const g = dctx.createRadialGradient(w.x,w.y,Math.max(1,rad-16),w.x,w.y,rad);
+    g.addColorStop(0,'rgba(161,196,253,0)');
+    g.addColorStop(.7,`rgba(161,196,253,${alpha})`);
+    g.addColorStop(1,'rgba(194,233,251,0)');
+    dctx.fillStyle = g;
+    dctx.beginPath(); dctx.arc(w.x,w.y,rad,0,7); dctx.fill();
+  });
+
+  if(dpath.length > 1){
+    // 2) 오로라 리본: 굵게→가늘게 다중 패스로 발광
+    dctx.lineJoin = dctx.lineCap = 'round';
+    const passes = [[24,0.07],[13,0.16],[5,0.5],[1.6,0.95]];
+    passes.forEach(([lw,al])=>{
+      dctx.lineWidth = lw; dctx.globalAlpha = al;
+      const grad = dctx.createLinearGradient(dpath[0].x,dpath[0].y,dpath[dpath.length-1].x,dpath[dpath.length-1].y);
+      grad.addColorStop(0,'#FFF6D6'); grad.addColorStop(.5,'#A1C4FD'); grad.addColorStop(1,'#C2E9FB');
+      dctx.strokeStyle = grad;
+      dctx.beginPath();
+      dctx.moveTo(dpath[0].x, dpath[0].y);
+      for(let i=1;i<dpath.length;i++){
+        const wob = Math.sin(dT*2 + i*0.5) * (lw>10 ? 2.5 : 0.8); // 빛이 일렁이는 느낌
+        const xc=(dpath[i-1].x+dpath[i].x)/2, yc=(dpath[i-1].y+dpath[i].y)/2 + wob;
+        dctx.quadraticCurveTo(dpath[i-1].x, dpath[i-1].y + wob, xc, yc);
+      }
+      dctx.stroke();
+    });
+    dctx.globalAlpha = 1;
+
+    // 3) 별자리 노드: 경로 위 지점마다 반짝이는 별
+    dpath.forEach((p,i)=>{
+      const appear = Math.min(1, (dT - p.born)*3);     // 그려질 때 살짝 부풀며 등장
+      const tw = 0.6 + 0.4*Math.sin(dT*3 + i);
+      const r = (1.6 + (i%3)) * appear;
+      const glow = dctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r*5);
+      glow.addColorStop(0,`rgba(255,255,255,${0.9*tw*appear})`);
+      glow.addColorStop(1,'rgba(161,196,253,0)');
+      dctx.fillStyle = glow;
+      dctx.beginPath(); dctx.arc(p.x,p.y,r*5,0,7); dctx.fill();
+      dctx.fillStyle = '#fff'; dctx.globalAlpha = tw*appear;
+      dctx.beginPath(); dctx.arc(p.x,p.y,r,0,7); dctx.fill(); dctx.globalAlpha = 1;
+    });
+  }
+  dRaf = requestAnimationFrame(renderDraw);
+}
+
+/* ---------- 정화 미션: 색 추출 ---------- */
+function avgColorFromImage(img){
+  const c = document.createElement('canvas');
+  c.width = 40; c.height = 40;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(img,0,0,40,40);
+  // 상단 절반(하늘 영역)만 샘플링
+  const data = ctx.getImageData(0,0,40,20).data;
+  let r=0,g=0,b=0,n=0;
+  for(let i=0;i<data.length;i+=4){ r+=data[i]; g+=data[i+1]; b+=data[i+2]; n++; }
+  r=Math.round(r/n); g=Math.round(g/n); b=Math.round(b/n);
+  return '#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('').toUpperCase();
+}
+
+const SAMPLE_HEX = ['#A1C4FD','#FFF6D6','#C2E9FB','#FF9E7D','#D2E6FF','#8FB3E8','#F5C36B'];
+
+function finishWithColor(hex, imgEl){
+  document.getElementById('hexCode').textContent = hex;
+  document.getElementById('hexSwatch').style.background = hex;
+  document.getElementById('resultStar').style.background = `radial-gradient(circle,#fff,${hex})`;
+  document.getElementById('resultStar').style.boxShadow = `0 0 20px 6px ${hex}aa`;
+  const rImg = document.getElementById('resultImg');
+  if(imgEl){ rImg.src = imgEl.src; rImg.classList.remove('hidden'); }
+  else { rImg.classList.add('hidden'); document.getElementById('resultSky').style.background = `linear-gradient(180deg,${hex},#dfe9f7)`; }
+  // 새 별을 은하수 데이터에 추가
+  galaxyStars.push({ x:(Math.random()*2-1)*0.7, y:(Math.random()*2-1)*0.7, hex, r:Math.random()*1.5+1.5 });
+  document.getElementById('analyzeBox').classList.add('hidden');
+  show('screen-result');
+}
+
+function capturePhoto(){
+  // 카메라 미지원 환경: 대표 하늘빛 샘플 사용
+  const box = document.getElementById('analyzeBox');
+  box.classList.remove('hidden');
+  setTimeout(()=>{
+    const hex = SAMPLE_HEX[Math.floor(Math.random()*SAMPLE_HEX.length)];
+    closeCapture();
+    finishWithColor(hex, null);
+  }, 1600);
+}
+
+function handleUpload(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const box = document.getElementById('analyzeBox');
+  box.classList.remove('hidden');
+  const img = new Image();
+  img.onload = ()=> setTimeout(()=>{
+    let hex;
+    try { hex = avgColorFromImage(img); } catch(err){ hex = SAMPLE_HEX[0]; }
+    closeCapture();
+    finishWithColor(hex, img);
+  }, 1500);
+  img.src = URL.createObjectURL(file);
+}
+
+/* ---------- 은하수(갤럭시) 캔버스 시각화 ---------- */
+let galaxyStars = [];
+let galaxyMode = 0; // 0:별자리 1:오로라 2:은하수
+const MODES = ['별자리','오로라','은하수'];
+let tiltX = 0, tiltY = 0, rafId = null, t = 0;
+
+// 초기 별 데이터(동선 순서대로) — API stars_trail 모사
+(function seedGalaxy(){
+  const base = ['#FFF6D6','#A1C4FD','#C2E9FB','#FF9E7D','#D2E6FF','#8FB3E8','#FFE9A8','#B5D0F5'];
+  let ang = -Math.PI*0.8, rad = 0.12;
+  for(let i=0;i<34;i++){
+    ang += 0.55 + Math.random()*0.25;
+    rad += 0.021;
+    galaxyStars.push({
+      x: Math.cos(ang)*rad + (Math.random()-.5)*0.05,
+      y: Math.sin(ang)*rad*0.8 + (Math.random()-.5)*0.05,
+      hex: base[i % base.length],
+      r: Math.random()*1.6+1.4
+    });
+  }
+})();
+
+function hexToRgb(h){ const n=parseInt(h.slice(1),16); return [n>>16&255,n>>8&255,n&255]; }
+
+function openGalaxy(){
+  show('screen-galaxy');
+  const cv = document.getElementById('galaxyCanvas');
+  const dpr = window.devicePixelRatio||1;
+  const W = cv.clientWidth, H = cv.clientHeight;
+  cv.width = W*dpr; cv.height = H*dpr;
+  const ctx = cv.getContext('2d');
+  ctx.scale(dpr,dpr);
+
+  cancelAnimationFrame(rafId);
+  function draw(){
+    t += 0.006;
+    ctx.clearRect(0,0,W,H);
+    // 깊은 우주 배경
+    const bg = ctx.createRadialGradient(W/2,H*0.45,40,W/2,H*0.45,H*0.75);
+    bg.addColorStop(0,'#10182c'); bg.addColorStop(1,'#05070d');
+    ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+
+    // 배경 미세 별
+    for(let i=0;i<60;i++){
+      const sx=(i*97%W), sy=((i*53)%H);
+      ctx.globalAlpha = 0.25+0.25*Math.sin(t*2+i);
+      ctx.fillStyle='#D2E6FF';
+      ctx.fillRect(sx,sy,1,1);
+    }
+    ctx.globalAlpha=1;
+
+    const cx=W/2, cy=H*0.45, scale=Math.min(W,H)*0.62;
+    // 자이로/마우스 기울기 반영한 패럴랙스
+    const ox = tiltX*22 + Math.sin(t)*6;
+    const oy = tiltY*22 + Math.cos(t*0.8)*5;
+
+    const pts = galaxyStars.map(s=>({
+      sx: cx + s.x*scale + ox,
+      sy: cy + s.y*scale + oy,
+      hex: s.hex, r: s.r, raw:s
+    }));
+
+    // 모드별 연결선
+    if(galaxyMode===0){ // 별자리: 가는 직선
+      ctx.lineWidth=1;
+      for(let i=1;i<pts.length;i++){
+        const g=ctx.createLinearGradient(pts[i-1].sx,pts[i-1].sy,pts[i].sx,pts[i].sy);
+        g.addColorStop(0,pts[i-1].hex+'cc'); g.addColorStop(1,pts[i].hex+'cc');
+        ctx.strokeStyle=g; ctx.globalAlpha=.5;
+        ctx.beginPath(); ctx.moveTo(pts[i-1].sx,pts[i-1].sy); ctx.lineTo(pts[i].sx,pts[i].sy); ctx.stroke();
+      }
+      ctx.globalAlpha=1;
+    } else if(galaxyMode===1){ // 오로라: 굵은 발광 곡선 리본
+      ctx.lineCap='round';
+      for(let pass=0; pass<3; pass++){
+        ctx.lineWidth = [22,12,4][pass];
+        ctx.globalAlpha = [0.10,0.18,0.5][pass];
+        ctx.beginPath();
+        ctx.moveTo(pts[0].sx, pts[0].sy);
+        for(let i=1;i<pts.length;i++){
+          const xc=(pts[i-1].sx+pts[i].sx)/2, yc=(pts[i-1].sy+pts[i].sy)/2;
+          ctx.quadraticCurveTo(pts[i-1].sx, pts[i-1].sy + Math.sin(t*2+i)*6, xc, yc);
+        }
+        const g=ctx.createLinearGradient(0,cy-scale,0,cy+scale);
+        g.addColorStop(0,'#A1C4FD'); g.addColorStop(.5,'#C2E9FB'); g.addColorStop(1,'#8FB3E8');
+        ctx.strokeStyle=g; ctx.stroke();
+      }
+      ctx.globalAlpha=1;
+    } else { // 은하수: 뭉친 성운 + 점묘
+      for(let i=0;i<pts.length;i++){
+        const p=pts[i];
+        const grd=ctx.createRadialGradient(p.sx,p.sy,0,p.sx,p.sy,34);
+        const [r,g,b]=hexToRgb(p.hex);
+        grd.addColorStop(0,`rgba(${r},${g},${b},.35)`); grd.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.fillStyle=grd; ctx.beginPath(); ctx.arc(p.sx,p.sy,34,0,7); ctx.fill();
+      }
+      // 흩뿌린 별먼지
+      for(let i=0;i<140;i++){
+        const a=t*0.3+i, rr=(i%pts.length); const base=pts[rr];
+        const px=base.sx+Math.cos(a*3+i)*( (i%18)+4 );
+        const py=base.sy+Math.sin(a*2+i)*( (i%18)+4 );
+        ctx.globalAlpha=.4+.4*Math.sin(t*3+i);
+        ctx.fillStyle=base.hex; ctx.fillRect(px,py,1.3,1.3);
+      }
+      ctx.globalAlpha=1;
+    }
+
+    // 별 본체 + 글로우
+    pts.forEach((p,i)=>{
+      const tw = 0.6+0.4*Math.sin(t*2.5 + i);
+      const [r,g,b]=hexToRgb(p.hex);
+      const glow=ctx.createRadialGradient(p.sx,p.sy,0,p.sx,p.sy,p.r*5);
+      glow.addColorStop(0,`rgba(${r},${g},${b},${0.8*tw})`); glow.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(p.sx,p.sy,p.r*5,0,7); ctx.fill();
+      ctx.fillStyle='#ffffff'; ctx.globalAlpha=tw;
+      ctx.beginPath(); ctx.arc(p.sx,p.sy,p.r,0,7); ctx.fill(); ctx.globalAlpha=1;
+    });
+
+    rafId = requestAnimationFrame(draw);
+  }
+  draw();
+}
+function closeGalaxy(){ cancelAnimationFrame(rafId); hide('screen-galaxy'); }
+function cycleMode(){
+  galaxyMode=(galaxyMode+1)%3;
+  document.getElementById('modeLabel').textContent = MODES[galaxyMode];
+}
+
+/* 기울기: 자이로(모바일) + 마우스(데스크탑) */
+window.addEventListener('deviceorientation', e=>{
+  if(e.gamma!=null){ tiltX = Math.max(-1,Math.min(1, e.gamma/45)); tiltY = Math.max(-1,Math.min(1,(e.beta-45)/45)); }
+});
+document.getElementById('galaxyCanvas').addEventListener('mousemove', e=>{
+  const r=e.currentTarget.getBoundingClientRect();
+  tiltX=((e.clientX-r.left)/r.width-0.5)*2;
+  tiltY=((e.clientY-r.top)/r.height-0.5)*2;
+});
+</script>
+</body>
+</html>

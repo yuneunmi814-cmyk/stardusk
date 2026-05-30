@@ -1,0 +1,226 @@
+# 경로: backend/app/services/tour_sync.py
+# 한국관광공사 OpenAPI 수집·정화 배치 (Phase 2)
+#  - 강원도(areaCode=32) 지역기반 관광정보를 페이지네이션으로 전량 수집
+#  - 위치기반 관광정보(on-demand 캐시 보강용) 함수도 함께 제공
+#  - 정규화 후 tour_spots 테이블에 content_id 기준 UPSERT (중복 없음)
+#
+# 단독 실행:
+#   cd backend
+#   python -m app.services.tour_sync                 # 강원 전역 동기화
+#   python -m app.services.tour_sync --area 32 --pages 5
+#
+# APScheduler/cron 에서 run_area_sync() 를 일배치로 호출하면 된다.
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import logging
+
+import httpx
+from sqlalchemy import text
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+from app.core.config import settings
+from app.db.session import AsyncSessionLocal
+
+logger = logging.getLogger("tour_sync")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
+# 공통 요청 파라미터 (KorService2)
+_COMMON_PARAMS = {
+    "serviceKey": settings.KTO_SERVICE_KEY,   # data.go.kr 에서 발급받은 '디코딩' 키
+    "MobileOS": "ETC",
+    "MobileApp": "STARDUST",
+    "_type": "json",
+}
+
+# content_id 기준 UPSERT. location 은 ST_MakePoint(lng, lat) → SRID 4326.
+_UPSERT_SQL = text(
+    """
+    INSERT INTO tour_spots (
+        content_id, content_type_id, spot_name, region, address,
+        area_code, sigungu_code, cat1, cat2, cat3, tel, image_url,
+        location, created_at, updated_at
+    ) VALUES (
+        :content_id, :content_type_id, :spot_name, :region, :address,
+        :area_code, :sigungu_code, :cat1, :cat2, :cat3, :tel, :image_url,
+        ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326), now(), now()
+    )
+    ON CONFLICT (content_id) DO UPDATE SET
+        content_type_id = EXCLUDED.content_type_id,
+        spot_name       = EXCLUDED.spot_name,
+        region          = EXCLUDED.region,
+        address         = EXCLUDED.address,
+        area_code       = EXCLUDED.area_code,
+        sigungu_code    = EXCLUDED.sigungu_code,
+        cat1            = EXCLUDED.cat1,
+        cat2            = EXCLUDED.cat2,
+        cat3            = EXCLUDED.cat3,
+        tel             = EXCLUDED.tel,
+        image_url       = EXCLUDED.image_url,
+        location        = EXCLUDED.location,
+        updated_at      = now();
+    """
+)
+
+
+# ---------------------------------------------------------------------------
+# 1) OpenAPI 호출
+# ---------------------------------------------------------------------------
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=1, max=8))
+async def _call(client: httpx.AsyncClient, operation: str, params: dict) -> dict:
+    """KorService2 오퍼레이션 호출 + 결과코드 검증 + 재시도."""
+    url = f"{settings.KTO_BASE_URL}/{operation}"
+    resp = await client.get(url, params={**_COMMON_PARAMS, **params}, timeout=15.0)
+    resp.raise_for_status()
+    payload = resp.json()
+
+    header = payload.get("response", {}).get("header", {})
+    if header.get("resultCode") not in ("0000", None):
+        raise RuntimeError(f"KTO API error: {header.get('resultCode')} {header.get('resultMsg')}")
+    return payload.get("response", {}).get("body", {})
+
+
+def _items(body: dict) -> list[dict]:
+    """응답 body 에서 item 리스트를 안전하게 추출(0건/단건 모두 처리)."""
+    items = body.get("items")
+    if not items:  # "" 또는 None → 0건
+        return []
+    item = items.get("item", [])
+    return item if isinstance(item, list) else [item]
+
+
+# ---------------------------------------------------------------------------
+# 2) 정규화 (외부 필드 → 내부 스키마)
+# ---------------------------------------------------------------------------
+def _region_from_addr(addr: str | None) -> str | None:
+    """주소 앞 두 토큰을 지역명으로 사용. 예) '강원특별자치도 강릉시 ...' → '강원특별자치도 강릉시'."""
+    if not addr:
+        return None
+    parts = addr.split()
+    return " ".join(parts[:2]) if parts else None
+
+
+def _normalize(item: dict) -> dict | None:
+    """관광공사 item → tour_spots 컬럼 dict. 좌표 없는 항목은 제외(None)."""
+    try:
+        lng = float(item.get("mapx"))   # mapx = 경도(longitude)
+        lat = float(item.get("mapy"))   # mapy = 위도(latitude)
+    except (TypeError, ValueError):
+        return None
+    if not (124.0 <= lng <= 132.0 and 33.0 <= lat <= 39.0):  # 한반도 범위 밖 좌표 제거
+        return None
+
+    addr = item.get("addr1") or None
+    return {
+        "content_id": str(item.get("contentid")),
+        "content_type_id": str(item.get("contenttypeid")) if item.get("contenttypeid") else None,
+        "spot_name": (item.get("title") or "").strip() or "이름 미상",
+        "region": _region_from_addr(addr),
+        "address": addr,
+        "area_code": str(item.get("areacode")) if item.get("areacode") else None,
+        "sigungu_code": str(item.get("sigungucode")) if item.get("sigungucode") else None,
+        "cat1": item.get("cat1") or None,
+        "cat2": item.get("cat2") or None,
+        "cat3": item.get("cat3") or None,
+        "tel": (item.get("tel") or "").strip() or None,
+        "image_url": item.get("firstimage") or None,
+        "longitude": lng,
+        "latitude": lat,
+    }
+
+
+# ---------------------------------------------------------------------------
+# 3) UPSERT
+# ---------------------------------------------------------------------------
+async def _upsert(rows: list[dict]) -> int:
+    if not rows:
+        return 0
+    async with AsyncSessionLocal() as session:
+        for row in rows:
+            await session.execute(_UPSERT_SQL, row)
+        await session.commit()
+    return len(rows)
+
+
+# ---------------------------------------------------------------------------
+# 4) 동기화 엔트리포인트
+# ---------------------------------------------------------------------------
+async def run_area_sync(area_code: str | None = None, num_of_rows: int = 100,
+                        max_pages: int | None = None) -> int:
+    """지역기반 관광정보(areaBasedList2)를 페이지네이션으로 전량 수집·UPSERT."""
+    area_code = area_code or settings.KTO_DEFAULT_AREA_CODE
+    total_saved = 0
+    page = 1
+
+    async with httpx.AsyncClient() as client:
+        while True:
+            body = await _call(
+                client,
+                "areaBasedList2",
+                {
+                    "areaCode": area_code,
+                    "numOfRows": num_of_rows,
+                    "pageNo": page,
+                    "arrange": "C",      # C: 등록일순(이미지 포함 우선은 'O')
+                    "listYN": "Y",
+                },
+            )
+            items = _items(body)
+            if not items:
+                break
+
+            rows = [r for r in (_normalize(i) for i in items) if r]
+            saved = await _upsert(rows)
+            total_saved += saved
+
+            total_count = int(body.get("totalCount", 0))
+            logger.info("page=%s fetched=%s saved=%s (누적 %s / 전체 %s)",
+                        page, len(items), saved, total_saved, total_count)
+
+            if page * num_of_rows >= total_count:
+                break
+            if max_pages and page >= max_pages:
+                break
+            page += 1
+
+    logger.info("✅ area=%s 동기화 완료: %s건 UPSERT", area_code, total_saved)
+    return total_saved
+
+
+async def fetch_location_based(latitude: float, longitude: float, radius: int = 1000,
+                               num_of_rows: int = 50) -> int:
+    """위치기반 관광정보(locationBasedList2). 캐시 미스 시 on-demand 보강용."""
+    async with httpx.AsyncClient() as client:
+        body = await _call(
+            client,
+            "locationBasedList2",
+            {
+                "mapX": longitude,   # 경도
+                "mapY": latitude,    # 위도
+                "radius": radius,
+                "numOfRows": num_of_rows,
+                "pageNo": 1,
+                "arrange": "E",      # E: 거리순
+            },
+        )
+        rows = [r for r in (_normalize(i) for i in _items(body)) if r]
+        return await _upsert(rows)
+
+
+def _main() -> None:
+    parser = argparse.ArgumentParser(description="STARDUST 관광 데이터 동기화")
+    parser.add_argument("--area", default=None, help="areaCode (기본: 강원 32)")
+    parser.add_argument("--rows", type=int, default=100, help="페이지당 건수")
+    parser.add_argument("--pages", type=int, default=None, help="최대 페이지(테스트용)")
+    args = parser.parse_args()
+
+    if not settings.KTO_SERVICE_KEY:
+        raise SystemExit("KTO_SERVICE_KEY 가 비어 있습니다. backend/.env 를 확인하세요.")
+
+    asyncio.run(run_area_sync(args.area, args.rows, args.pages))
+
+
+if __name__ == "__main__":
+    _main()
