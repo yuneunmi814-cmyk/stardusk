@@ -137,6 +137,50 @@ struct SkyVideo: Decodable, Identifiable {
         case skyColorHex, emotionLabel, palette, brightness, skyScore, createdAt
     }
 }
+
+/// 자동재생 피드 셀이 요구하는 최소 정보(업로드 결과·트렌딩 아이템이 공유).
+protocol PlayableSky: Identifiable {
+    var id: String { get }
+    var videoURL: URL { get }
+    var thumbnailURL: URL? { get }
+    var skyColorHex: String { get }
+    var emotionLabel: String? { get }
+}
+
+extension SkyVideo: PlayableSky {}
+
+/// GET /community/trending 의 items 요소
+struct TrendingItem: Decodable, PlayableSky {
+    let skyVideoId: String
+    let userId: String
+    let tourId: String?
+    let region: String?       // 서버가 좌표로 매핑한 지역명
+    let spotName: String?     // 명소명
+    let videoURL: URL
+    let thumbnailURL: URL?
+    let skyColorHex: String
+    let emotionLabel: String?
+    let latitude: Double
+    let longitude: Double
+    let liveUsersCount: Int    // 실시간 동시 접속자 수
+    let isGangwon: Bool        // 강원도 가중치 대상 여부
+    let createdAt: Date
+
+    var id: String { skyVideoId }
+
+    enum CodingKeys: String, CodingKey {
+        case skyVideoId, userId, tourId, region, spotName
+        case videoURL = "videoUrl"
+        case thumbnailURL = "thumbnailUrl"
+        case skyColorHex, emotionLabel, latitude, longitude, liveUsersCount, isGangwon, createdAt
+    }
+}
+
+/// 트렌딩 응답의 data ({ total, items })
+struct TrendingPage: Decodable {
+    let total: Int
+    let items: [TrendingItem]
+}
 ```
 
 > `JSONDecoder.keyDecodingStrategy = .convertFromSnakeCase` 를 쓰면 `sky_video_id → skyVideoId`,
@@ -198,6 +242,41 @@ actor StardustAPI {
         }
         do { return try Self.decoder.decode(T.self, from: data) }
         catch { throw StardustError.decoding(error) }
+    }
+
+    // MARK: 인증 — 소셜 토큰 → 내부 JWT
+    struct AuthData: Decodable {
+        let userId: String
+        let nickname: String
+        let accessToken: String
+        let expiresIn: Int
+    }
+
+    func login(provider: String, identityToken: String, nickname: String?) async throws -> AuthData {
+        var req = URLRequest(url: baseURL.appendingPathComponent("auth/login"))
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        var body: [String: Any] = ["provider": provider, "identity_token": identityToken]
+        if let nickname { body["nickname"] = nickname }
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let env = try await run(req, as: APIEnvelope<AuthData>.self)
+        return env.data
+    }
+
+    // MARK: 트렌딩 피드 — 동접 + 강원 가중치 순
+    func fetchTrending(limit: Int = 20, offset: Int = 0) async throws -> [TrendingItem] {
+        var comp = URLComponents(
+            url: baseURL.appendingPathComponent("community/trending"),
+            resolvingAgainstBaseURL: false
+        )!
+        comp.queryItems = [
+            .init(name: "limit", value: String(limit)),
+            .init(name: "offset", value: String(offset)),
+        ]
+        var req = URLRequest(url: comp.url!)
+        req.httpMethod = "GET"
+        let env = try await run(req, as: APIEnvelope<TrendingPage>.self)
+        return env.data.items
     }
 
     // MARK: 멀티파트 바디 빌더
@@ -437,8 +516,80 @@ struct SafeZoneSetupView: View {
 }
 ```
 
-> `MapPinPicker` 는 `MapReader { reader in Map { … }.onTapGesture { reader.convert(...) } }`
-> (iOS 17) 또는 중앙 고정 핀 + 카메라 중심 좌표로 간단히 구현하면 된다.
+### 3.3 MapPinPicker (iOS 17 `MapReader` 기반, 완성 코드)
+
+탭한 지점이든 지도 중심이든 한 번에 안전지대 좌표를 잡을 수 있게 만든 픽커.
+
+```swift
+import SwiftUI
+import MapKit
+import CoreLocation
+
+@available(iOS 17.0, *)
+struct MapPinPicker: View {
+    @Binding var coordinate: CLLocationCoordinate2D?
+
+    // 기본 카메라: 강원 강릉(서비스 주무대) 근방
+    @State private var camera: MapCameraPosition = .region(
+        MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: 37.7519, longitude: 128.8761),
+            span: MKCoordinateSpan(latitudeDelta: 0.03, longitudeDelta: 0.03)
+        )
+    )
+    @State private var centerCoordinate = CLLocationCoordinate2D(latitude: 37.7519, longitude: 128.8761)
+
+    var body: some View {
+        ZStack {
+            MapReader { proxy in
+                Map(position: $camera) {
+                    if let coordinate {
+                        Annotation("내 안전지대", coordinate: coordinate) {
+                            Image(systemName: "house.circle.fill")
+                                .font(.title)
+                                .foregroundStyle(.white, Color(hex: "#7FA8E0"))
+                                .shadow(radius: 4)
+                        }
+                    }
+                    UserAnnotation()   // 현재 위치 점
+                }
+                .mapControls { MapUserLocationButton(); MapCompass() }
+                // ① 지도를 탭하면 그 지점을 좌표로 변환해 선택
+                .onTapGesture { screenPoint in
+                    if let c = proxy.convert(screenPoint, from: .local) {
+                        withAnimation(.spring) { coordinate = c }
+                    }
+                }
+                // ② 카메라가 멈출 때마다 중심 좌표를 기억(중앙 핀 방식 지원)
+                .onMapCameraChange(frequency: .onEnd) { ctx in
+                    centerCoordinate = ctx.region.center
+                }
+            }
+
+            // 중앙 고정 조준 핀: 탭하지 않아도 '지도 중심'을 지정할 수 있게 한다.
+            if coordinate == nil {
+                Image(systemName: "scope")
+                    .font(.title)
+                    .foregroundStyle(Color(hex: "#7FA8E0"))
+                    .allowsHitTesting(false)
+            }
+        }
+        .overlay(alignment: .bottom) {
+            Button {
+                withAnimation(.spring) { coordinate = centerCoordinate }
+            } label: {
+                Label("이 지도 중심으로 지정", systemImage: "mappin.and.ellipse")
+                    .font(.caption.bold())
+                    .padding(.horizontal, 14).padding(.vertical, 9)
+                    .background(.ultraThinMaterial, in: Capsule())
+            }
+            .padding(.bottom, 12)
+        }
+    }
+}
+```
+
+> 지도에서 현재 위치 점(`UserAnnotation`)을 쓰려면 `CLLocationManager` 권한
+> (`NSLocationWhenInUseUsageDescription`)이 이미 허용돼 있어야 한다(§6 체크리스트).
 
 ---
 
@@ -482,54 +633,258 @@ final class UserProfileStore: ObservableObject {
 }
 ```
 
-### 4.2 별빛 Glow 아바타 뷰
+### 4.2 프로필 헤더 (업로드 직후 별빛이 새 하늘색으로 번진다)
 
 ```swift
-struct StarGlowAvatar: View {
-    let colorHex: String
-    var size: CGFloat = 88
-    @State private var pulse = false
-
-    private var color: Color { Color(hex: colorHex) }
-
-    var body: some View {
-        ZStack {
-            // 바깥쪽 부드러운 발광(숨쉬는 듯한 펄스)
-            Circle()
-                .fill(color)
-                .frame(width: size, height: size)
-                .blur(radius: pulse ? 26 : 18)
-                .opacity(pulse ? 0.85 : 0.55)
-            // 본체
-            Circle()
-                .fill(color.gradient)
-                .frame(width: size, height: size)
-                .overlay(Circle().stroke(.white.opacity(0.6), lineWidth: 1))
-                .shadow(color: color.opacity(0.8), radius: 12)
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) {
-                pulse = true
-            }
-        }
-    }
-}
-
-// 사용 예: 업로드 완료 직후 아바타가 새 하늘색으로 번진다
+// 아바타 본체(StarGlowAvatar)와 하늘빛 팔레트(SkyMood)는 §4.3~4.4 에서 정의한다.
 struct ProfileHeader: View {
     @StateObject private var profile = UserProfileStore.shared
+
     var body: some View {
-        VStack(spacing: 8) {
-            StarGlowAvatar(colorHex: profile.avatarColorHex)
+        VStack(spacing: 10) {
+            StarGlowAvatar(colorHex: profile.avatarColorHex,
+                           emotion: profile.latestEmotion)
             if let emotion = profile.latestEmotion {
-                Text(emotion).font(.callout.weight(.medium))
-                    .foregroundStyle(Color(hex: profile.avatarColorHex))
+                Text(emotion)
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(SkyMood.resolve(emotion: emotion,
+                                                      hex: profile.avatarColorHex).accent)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }
-        .animation(.easeInOut, value: profile.avatarColorHex)
+        .animation(.easeInOut(duration: 0.8), value: profile.avatarColorHex)
     }
 }
 ```
+
+---
+
+### 4.3 하루의 하늘빛 그러데이션 시스템 (`SkyMood`)
+
+> 앱 아이콘(파스텔 새벽·노을 오브)의 결을 그대로 코드로 옮긴 팔레트.
+> 서버가 준 **감정 라벨**을 1순위로, 없으면 **대표색 Hue** 로 추정해 그러데이션을 만든다.
+> `color_extract.py` 의 11개 감정 라벨과 1:1로 대응한다.
+
+```swift
+import SwiftUI
+
+// MARK: - 색 보정 헬퍼 (대표색에서 위·아래 톤을 만들어 자연스러운 하늘 결 생성)
+extension Color {
+    func lighter(_ amount: CGFloat) -> Color { adjust(brightness: amount) }
+    func darker(_ amount: CGFloat) -> Color { adjust(brightness: -amount) }
+
+    private func adjust(brightness delta: CGFloat) -> Color {
+        #if canImport(UIKit)
+        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        guard UIColor(self).getHue(&h, saturation: &s, brightness: &b, alpha: &a) else { return self }
+        return Color(hue: Double(h), saturation: Double(s),
+                     brightness: Double(min(max(b + delta, 0), 1)), opacity: Double(a))
+        #else
+        return self
+        #endif
+    }
+}
+
+// MARK: - 하루의 모든 하늘빛
+enum SkyMood {
+    case dawn        // 차분한 새벽 — 남보라→라벤더→연분홍
+    case rosyDawn    // 분홍빛 여명 — 로즈→피치
+    case clearDay    // 맑은 오후 — 청량한 하늘
+    case sunshine    // 눈부신 햇살 — 하늘→레몬
+    case sunset      // 따뜻한 노을 — 보라→주황→살구
+    case night       // 고요한 밤 — 짙은 남색
+    case deepBlue    // 깊은 쪽빛
+    case clouds      // 잔잔한 구름 — 화이트→연하늘
+    case overcast    // 흐린 오후 — 그레이
+    case greenery    // 싱그러운 풀빛
+    case aqua        // 청량한 물빛
+    case custom([Color])
+
+    /// 감정 라벨 우선 → 없으면 대표색에서 톤을 뽑아 그러데이션 구성.
+    static func resolve(emotion: String?, hex: String) -> SkyMood {
+        switch emotion {
+        case "차분한 새벽":   return .dawn
+        case "분홍빛 여명":   return .rosyDawn
+        case "맑은 오후":     return .clearDay
+        case "눈부신 햇살":   return .sunshine
+        case "따뜻한 노을":   return .sunset
+        case "고요한 밤":     return .night
+        case "깊은 쪽빛":     return .deepBlue
+        case "잔잔한 구름":   return .clouds
+        case "흐린 오후":     return .overcast
+        case "싱그러운 풀빛": return .greenery
+        case "청량한 물빛":   return .aqua
+        default:
+            let base = Color(hex: hex)
+            return .custom([base.lighter(0.28), base, base.darker(0.22)])
+        }
+    }
+
+    /// 위(하늘 높이)에서 아래(지평선)로 흐르는 색 정지점.
+    var stops: [Color] {
+        switch self {
+        case .dawn:     return [Color(hex:"#3A2E6E"), Color(hex:"#7A6FB0"), Color(hex:"#E9B7C8")]
+        case .rosyDawn: return [Color(hex:"#F7A8B8"), Color(hex:"#FBC7D4"), Color(hex:"#FCD9A8")]
+        case .clearDay: return [Color(hex:"#5794E4"), Color(hex:"#8FBEF0"), Color(hex:"#CFE5FB")]
+        case .sunshine: return [Color(hex:"#7EC8F2"), Color(hex:"#BFE3F5"), Color(hex:"#FCEFB0")]
+        case .sunset:   return [Color(hex:"#5B3A82"), Color(hex:"#E8746B"), Color(hex:"#FBC18B")]
+        case .night:    return [Color(hex:"#070B1E"), Color(hex:"#1B2350"), Color(hex:"#3A4A86")]
+        case .deepBlue: return [Color(hex:"#16306B"), Color(hex:"#2456A6"), Color(hex:"#5E8FD6")]
+        case .clouds:   return [Color(hex:"#DCE7F2"), Color(hex:"#EAF1F8"), Color(hex:"#F8FBFE")]
+        case .overcast: return [Color(hex:"#8A95A3"), Color(hex:"#AEB7C2"), Color(hex:"#D2D8DF")]
+        case .greenery: return [Color(hex:"#2E7D5B"), Color(hex:"#6FB58C"), Color(hex:"#CFE9D6")]
+        case .aqua:     return [Color(hex:"#1C8C9E"), Color(hex:"#5FBFCB"), Color(hex:"#C7ECEF")]
+        case .custom(let c): return c
+        }
+    }
+
+    var gradient: LinearGradient {
+        LinearGradient(colors: stops, startPoint: .top, endPoint: .bottom)
+    }
+    /// 텍스트/포인트에 쓸 중간 대표색.
+    var accent: Color { stops[stops.count / 2] }
+    /// 밤/노을처럼 어두운 무드일 때 별이 더 잘 보이도록.
+    var prefersBrightStars: Bool {
+        switch self { case .night, .deepBlue, .dawn, .sunset: return true; default: return false }
+    }
+}
+```
+
+---
+
+### 4.4 살아있는 하늘 배경 + 별빛 펄스 아바타
+
+#### (a) `SkyGradientBackground` — 숨 쉬듯 일렁이는 하늘 + 반짝이는 별
+
+```swift
+import SwiftUI
+
+/// 그러데이션 위로 빛무리가 천천히 흐르고, 별이 깜빡이는 '살아있는' 하늘 배경.
+struct SkyGradientBackground: View {
+    let mood: SkyMood
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: false)) { timeline in
+            let t = timeline.date.timeIntervalSinceReferenceDate
+            ZStack {
+                mood.gradient.ignoresSafeArea()
+
+                // 천천히 떠다니는 빛무리(하늘이 숨 쉬는 느낌)
+                RadialGradient(
+                    colors: [mood.stops.first!.opacity(0.0),
+                             mood.accent.opacity(0.30)],
+                    center: UnitPoint(x: 0.5 + 0.22 * sin(t * 0.12),
+                                      y: 0.34 + 0.14 * cos(t * 0.09)),
+                    startRadius: 8, endRadius: 460
+                )
+                .blendMode(.plusLighter)
+                .ignoresSafeArea()
+
+                StarfieldOverlay(date: timeline.date,
+                                 bright: mood.prefersBrightStars)
+                    .ignoresSafeArea()
+            }
+        }
+    }
+}
+
+/// Canvas 로 그린 가벼운 별 입자(60개) — 각자 다른 위상으로 반짝인다.
+struct StarfieldOverlay: View {
+    let date: Date
+    var bright: Bool = true
+
+    private struct Star { let x, y, r: CGFloat; let phase: Double }
+    private let stars: [Star] = (0..<60).map { _ in
+        Star(x: .random(in: 0...1), y: .random(in: 0...1),
+             r: .random(in: 0.6...1.9), phase: .random(in: 0...(2 * .pi)))
+    }
+
+    var body: some View {
+        Canvas { ctx, size in
+            let t = date.timeIntervalSinceReferenceDate
+            let baseAlpha = bright ? 0.9 : 0.35
+            for s in stars {
+                let twinkle = 0.25 + 0.75 * (0.5 + 0.5 * sin(t * 1.5 + s.phase))
+                let d = s.r * 2
+                let rect = CGRect(x: s.x * size.width, y: s.y * size.height, width: d, height: d)
+                ctx.opacity = twinkle * baseAlpha
+                ctx.fill(Path(ellipseIn: rect), with: .color(.white))
+            }
+        }
+        .allowsHitTesting(false)
+        .blendMode(.screen)
+    }
+}
+```
+
+#### (b) `StarGlowAvatar` — 회전 오로라 링 + 숨쉬는 펄스 (최종 버전)
+
+```swift
+import SwiftUI
+
+/// 유저가 올려다본 하늘색이 곧 자신의 별빛이 된다.
+/// 후광 펄스(숨쉬기) + 오로라 링(회전) + 유리알 하이라이트로 '살아있는 별'을 표현.
+struct StarGlowAvatar: View {
+    let colorHex: String
+    var emotion: String? = nil
+    var size: CGFloat = 96
+
+    private var mood: SkyMood { SkyMood.resolve(emotion: emotion, hex: colorHex) }
+    @State private var breathe = false
+    @State private var spin = false
+
+    var body: some View {
+        ZStack {
+            // ① 바깥 후광 — 부드럽게 번지며 숨 쉰다
+            Circle()
+                .fill(mood.accent)
+                .frame(width: size, height: size)
+                .blur(radius: breathe ? 34 : 22)
+                .opacity(breathe ? 0.9 : 0.45)
+                .scaleEffect(breathe ? 1.18 : 0.9)
+
+            // ② 오로라 링 — 하늘빛 그러데이션이 천천히 회전
+            Circle()
+                .strokeBorder(
+                    AngularGradient(colors: mood.stops + [mood.stops.first!], center: .center),
+                    lineWidth: 6
+                )
+                .frame(width: size * 1.14, height: size * 1.14)
+                .blur(radius: 2)
+                .rotationEffect(.degrees(spin ? 360 : 0))
+                .opacity(0.85)
+
+            // ③ 본체 — 하늘 그러데이션 오브(아이콘 결)
+            Circle()
+                .fill(mood.gradient)
+                .frame(width: size, height: size)
+                .overlay(Circle().stroke(.white.opacity(0.7), lineWidth: 1))
+                .overlay(
+                    // 유리알 하이라이트
+                    Circle()
+                        .fill(.white.opacity(0.28))
+                        .frame(width: size * 0.4, height: size * 0.4)
+                        .blur(radius: 6)
+                        .offset(x: -size * 0.16, y: -size * 0.2)
+                )
+                .shadow(color: mood.accent.opacity(0.7), radius: 14)
+        }
+        .frame(width: size * 1.45, height: size * 1.45)   // 후광 여백 확보
+        .onAppear {
+            withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) { breathe = true }
+            withAnimation(.linear(duration: 18).repeatForever(autoreverses: false)) { spin = true }
+        }
+        .accessibilityLabel(Text(emotion ?? "오늘의 하늘빛"))
+    }
+}
+```
+
+> **무드 ↔ 화면 연동 팁**
+> - 프로필/상세 화면 배경에 `SkyGradientBackground(mood: SkyMood.resolve(emotion:hex:))` 를 깔면
+>   업로드 결과의 감정이 화면 전체 분위기로 확장된다.
+> - 업로드 완료 시 `UserProfileStore.applyLatestStar(...)` 가 `avatarColorHex` 를 바꾸고,
+>   `StarGlowAvatar`/`SkyGradientBackground` 가 SwiftUI `animation` 으로 부드럽게 크로스페이드된다.
+> - 밤/노을 무드는 `prefersBrightStars == true` 라 별이 더 또렷하게 반짝인다.
 
 ---
 
@@ -644,15 +999,12 @@ final class FeedStageCoordinator: ObservableObject {
 ### 5.4 자동재생 셀 (GeometryReader 가시성 감지)
 
 ```swift
-struct AutoplayVideoCell: View {
-    let video: SkyVideo
+struct AutoplayVideoCell<Item: PlayableSky>: View where Item.ID == String {
+    let video: Item
     @EnvironmentObject private var stage: FeedStageCoordinator
     @StateObject private var vm: VideoCellViewModel
 
-    // 무대 중앙 ±활성 허용 범위(절반 높이). 이 안이면 활성 후보.
-    private let activeBand: CGFloat = 0.5
-
-    init(video: SkyVideo) {
+    init(video: Item) {
         self.video = video
         _vm = StateObject(wrappedValue: VideoCellViewModel(url: video.videoURL))
     }
@@ -716,29 +1068,102 @@ struct AutoplayVideoCell: View {
 ### 5.5 피드 화면 조립
 
 ```swift
+import SwiftUI
+
+@MainActor
+final class TrendingFeedViewModel: ObservableObject {
+    @Published private(set) var items: [TrendingItem] = []
+    @Published private(set) var isLoading = false
+    @Published var errorText: String?
+
+    private let api = StardustAPI.shared
+    private let pageSize = 20
+    private var canLoadMore = true
+
+    /// 첫 진입/당겨서 새로고침.
+    func refresh() async {
+        canLoadMore = true
+        await load(reset: true)
+    }
+
+    /// 마지막 셀이 보이면 다음 페이지.
+    func loadMoreIfNeeded(current item: TrendingItem) async {
+        guard let last = items.last, last.id == item.id, canLoadMore, !isLoading else { return }
+        await load(reset: false)
+    }
+
+    private func load(reset: Bool) async {
+        guard !isLoading else { return }
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let offset = reset ? 0 : items.count
+            let page = try await api.fetchTrending(limit: pageSize, offset: offset)
+            if reset { items = page } else { items.append(contentsOf: page) }
+            if page.count < pageSize { canLoadMore = false }
+            errorText = nil
+        } catch let e as StardustError {
+            errorText = e.errorDescription
+        } catch {
+            errorText = "피드를 불러오지 못했어요."
+        }
+    }
+}
+
 struct TrendingFeedView: View {
     @StateObject private var stage = FeedStageCoordinator()
-    @State private var videos: [SkyVideo] = []
+    @StateObject private var vm = TrendingFeedViewModel()
 
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 16) {
-                ForEach(videos) { video in
-                    AutoplayVideoCell(video: video)
+                ForEach(vm.items) { item in
+                    AutoplayVideoCell(video: item)
                         .environmentObject(stage)
+                        .overlay(alignment: .topLeading) { metaBadge(item) }
                         .padding(.horizontal, 16)
+                        .task { await vm.loadMoreIfNeeded(current: item) }
+                }
+                if vm.isLoading {
+                    ProgressView().tint(.white).padding(.vertical, 24)
                 }
             }
             .padding(.vertical, 12)
         }
         .background(Color.black.ignoresSafeArea())
-        .task { await loadTrending() }
+        .refreshable { await vm.refresh() }     // 당겨서 새로고침
+        .overlay { if let err = vm.errorText, vm.items.isEmpty { errorState(err) } }
+        .task { if vm.items.isEmpty { await vm.refresh() } }
     }
 
-    private func loadTrending() async {
-        // GET /community/trending 호출 후 videos 에 매핑 (응답 구조는 SkyVideo 와 유사)
-        // let env = try await StardustAPI.shared.fetchTrending()
-        // videos = env.data.items
+    // 명소명/지역 + 동시 접속자 배지 (서버가 좌표로 매핑해 준 값)
+    @ViewBuilder
+    private func metaBadge(_ item: TrendingItem) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let spot = item.spotName ?? item.region {
+                Label(spot, systemImage: item.isGangwon ? "mountain.2.fill" : "mappin")
+                    .font(.caption2.bold())
+                    .padding(.horizontal, 9).padding(.vertical, 5)
+                    .background(.ultraThinMaterial, in: Capsule())
+            }
+            if item.liveUsersCount > 0 {
+                Label("\(item.liveUsersCount)명이 같은 하늘 아래", systemImage: "dot.radiowaves.left.and.right")
+                    .font(.caption2.weight(.semibold))
+                    .padding(.horizontal, 9).padding(.vertical, 5)
+                    .background(.thinMaterial, in: Capsule())
+            }
+        }
+        .padding(26)
+    }
+
+    @ViewBuilder
+    private func errorState(_ message: String) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: "cloud.rain").font(.largeTitle).foregroundStyle(.white.opacity(0.7))
+            Text(message).foregroundStyle(.white.opacity(0.8))
+            Button("다시 시도") { Task { await vm.refresh() } }
+                .buttonStyle(.borderedProminent)
+        }
     }
 }
 ```
@@ -751,25 +1176,176 @@ struct TrendingFeedView: View {
 
 ---
 
-## 6. 권장 앱 부트스트랩 순서
+## 6. 세션/토큰 보관 + 앱 부트스트랩
+
+`access_token` 은 탈취 위험이 큰 `UserDefaults` 가 아니라 **Keychain** 에 저장한다.
+아래는 그대로 복사해 쓸 수 있는 ① Keychain 래퍼, ② 세션 상태 머신, ③ 앱 진입점 3종 세트다.
+
+### 6.1 KeychainStore — Security 프레임워크 얇은 래퍼
+
+```swift
+import Foundation
+import Security
+
+/// 토큰 같은 민감 문자열을 Keychain(kSecClassGenericPassword)에 저장/조회/삭제한다.
+/// - UserDefaults 와 달리 기기 잠금/탈옥 보호를 받고, 앱 삭제 시까지 안전하게 남는다.
+/// - 접근성: `.afterFirstUnlock` → 부팅 후 한 번 잠금 해제하면 백그라운드에서도 읽힘
+///   (백그라운드 업로드/리프레시에 필요). iCloud 동기화는 막아 기기 로컬에만 둔다.
+enum KeychainStore {
+    /// 같은 앱/디바이스 내 키 충돌 방지용 서비스 네임스페이스
+    private static let service = "app.stardust.session"
+
+    @discardableResult
+    static func set(_ value: String, for key: String) -> Bool {
+        guard let data = value.data(using: .utf8) else { return false }
+        // upsert: 기존 항목을 지우고 새로 넣어 중복(errSecDuplicateItem)을 피한다.
+        let base: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: key,
+        ]
+        SecItemDelete(base as CFDictionary)
+
+        var insert = base
+        insert[kSecValueData as String] = data
+        insert[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        return SecItemAdd(insert as CFDictionary, nil) == errSecSuccess
+    }
+
+    static func get(_ key: String) -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: key,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+              let data = item as? Data,
+              let value = String(data: data, encoding: .utf8) else { return nil }
+        return value
+    }
+
+    @discardableResult
+    static func remove(_ key: String) -> Bool {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: key,
+        ]
+        let status = SecItemDelete(query as CFDictionary)
+        return status == errSecSuccess || status == errSecItemNotFound
+    }
+}
+```
+
+### 6.2 SessionStore — 로그인/로그아웃 상태 머신
+
+```swift
+import Foundation
+
+/// 앱 전역 인증 상태. View 는 이걸 @EnvironmentObject 로 구독한다.
+/// 토큰은 Keychain 에만 저장하고, 메모리 캐시는 휘발성으로만 들고 있는다.
+@MainActor
+final class SessionStore: ObservableObject {
+
+    // Keychain 키 (account)
+    private enum K {
+        static let token = "access_token"
+        static let userId = "user_id"
+        static let nickname = "nickname"
+    }
+
+    @Published private(set) var accessToken: String?
+    @Published private(set) var userId: String?
+    @Published private(set) var nickname: String?
+
+    /// 최초 1회 Safe Zone 온보딩 시트 트리거 (부트스트랩에서 set)
+    @Published var showSafeZoneSetup = false
+
+    var isAuthenticated: Bool { accessToken?.isEmpty == false }
+
+    private let api = StardustAPI.shared
+
+    init() {
+        // 앱 재실행 시 Keychain 에서 토큰 복원 (자동 로그인)
+        self.accessToken = KeychainStore.get(K.token)
+        self.userId = KeychainStore.get(K.userId)
+        self.nickname = KeychainStore.get(K.nickname)
+    }
+
+    /// 부팅 시 1회: 저장된 토큰을 API 액터에 주입한다.
+    func bootstrap() async {
+        await api.setToken(accessToken)
+    }
+
+    /// Sign in with Apple 등으로 얻은 identityToken 으로 서버 로그인 → 토큰 영구 보관.
+    func login(provider: String, identityToken: String, nickname: String? = nil) async throws {
+        let auth = try await api.login(provider: provider,
+                                       identityToken: identityToken,
+                                       nickname: nickname)
+        persist(token: auth.accessToken, userId: auth.userId, nickname: auth.nickname)
+        await api.setToken(auth.accessToken)
+    }
+
+    /// 로그아웃: 메모리 + Keychain + API 토큰 모두 비운다.
+    func logout() {
+        KeychainStore.remove(K.token)
+        KeychainStore.remove(K.userId)
+        KeychainStore.remove(K.nickname)
+        accessToken = nil
+        userId = nil
+        nickname = nil
+        Task { await api.setToken(nil) }
+    }
+
+    private func persist(token: String, userId: String, nickname: String) {
+        KeychainStore.set(token, for: K.token)
+        KeychainStore.set(userId, for: K.userId)
+        KeychainStore.set(nickname, for: K.nickname)
+        self.accessToken = token
+        self.userId = userId
+        self.nickname = nickname
+    }
+}
+```
+
+### 6.3 앱 진입점 — 토큰 주입 → Safe Zone 온보딩 순서
 
 ```swift
 @main
 struct StardustApp: App {
-    @StateObject private var session = SessionStore()   // 토큰 보관(Keychain 권장)
+    @StateObject private var session = SessionStore()   // 토큰은 Keychain 에 보관
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(session)
                 .task {
-                    // 1) 저장된 토큰 주입 (없으면 로그인 플로우)
-                    await StardustAPI.shared.setToken(session.accessToken)
+                    // 1) Keychain 에 저장돼 있던 토큰을 API 액터에 주입(자동 로그인)
+                    await session.bootstrap()
                     // 2) 최초 1회 Safe Zone 온보딩
-                    if !SafeZoneManager.shared.hasCompletedSetup {
+                    if session.isAuthenticated, !SafeZoneManager.shared.hasCompletedSetup {
                         session.showSafeZoneSetup = true
                     }
                 }
+                .sheet(isPresented: $session.showSafeZoneSetup) {
+                    SafeZoneSetupView()      // §3.2 — 완료 시 hasCompletedSetup = true
+                }
+        }
+    }
+}
+
+/// 인증 상태에 따라 로그인/메인을 가르는 루트.
+struct RootView: View {
+    @EnvironmentObject private var session: SessionStore
+
+    var body: some View {
+        if session.isAuthenticated {
+            TrendingFeedView()           // §5.5 무대(피드)
+        } else {
+            LoginView()                  // Sign in with Apple → session.login(...)
         }
     }
 }
