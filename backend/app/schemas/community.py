@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.schemas.star import PaletteColor
+
 
 class ParticipantProfile(BaseModel):
     """방에 함께 있는 유저의 '별자리 프로필'.
@@ -89,3 +91,28 @@ class TrendingResponse(BaseModel):
     status: str = "success"
     message: str = "지금 가장 많은 사람들이 함께 올려다보는 하늘입니다."
     data: TrendingData
+
+
+# ---------------------------------------------------------------------------
+# 하늘 영상 업로드 (POST /community/videos)
+# ---------------------------------------------------------------------------
+class SkyVideoData(BaseModel):
+    sky_video_id: UUID
+    trip_id: int | None = None
+    tour_id: str | None = None
+    latitude: float
+    longitude: float
+    video_url: str
+    thumbnail_url: str = Field(..., description="첫 프레임 썸네일 URL")
+    sky_color_hex: str = Field(..., description="첫 프레임 상단 절반 대표 색상(Phase 4)")
+    emotion_label: str | None = None
+    palette: list[PaletteColor] = Field(default_factory=list, description="상위 색상 비율")
+    brightness: float | None = None
+    sky_score: float | None = Field(default=None, description="하늘 가능성 휴리스틱(0~1)")
+    created_at: datetime
+
+
+class SkyVideoCreateResponse(BaseModel):
+    status: str = "success"
+    message: str = "당신의 하늘이 모두의 밤하늘에 더해졌습니다."
+    data: SkyVideoData

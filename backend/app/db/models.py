@@ -249,6 +249,13 @@ class SkyVideo(SQLModel, table=True):
     user_id: uuid.UUID = Field(
         sa_column=Column(PG_UUID(as_uuid=True), index=True, nullable=False)
     )
+    # 여정(별자리 단위)에 영상을 연결(선택). 여정 삭제 시 영상은 남기고 연결만 해제.
+    trip_id: Optional[int] = Field(
+        default=None,
+        sa_column=Column(
+            BigInteger, ForeignKey("user_trips.id", ondelete="SET NULL"), index=True
+        ),
+    )
     tour_id: Optional[str] = Field(
         default=None,
         sa_column=Column(

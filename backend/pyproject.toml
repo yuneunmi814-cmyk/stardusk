@@ -44,6 +44,8 @@ dependencies = [
     "pillow>=10.2",                   # 하늘 이미지 디코딩/EXIF 제거
     "numpy>=1.26",                    # 픽셀 연산
     "scikit-learn>=1.4",              # KMeans 대표색 추출
+    "imageio>=2.34",                  # 하늘 영상 첫 프레임 추출
+    "imageio-ffmpeg>=0.4.9",          # 정적 ffmpeg 바이너리(시스템 설치 불필요)
 
     # --- 스케줄러(관광 데이터 일배치 동기화) ---
     "apscheduler>=3.10",

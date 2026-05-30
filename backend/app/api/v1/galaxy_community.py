@@ -10,7 +10,16 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    UploadFile,
+    status,
+)
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,14 +33,26 @@ from app.schemas.community import (
     RoomJoinResponse,
     RoomLeaveData,
     RoomLeaveResponse,
+    SkyVideoCreateResponse,
+    SkyVideoData,
     TrendingData,
     TrendingItem,
     TrendingResponse,
 )
+from app.schemas.star import PaletteColor
+from app.services.color_extract import ImageDecodeError, process_sky_image
 from app.services.live_session import (
     ALIVE_WINDOW_SEC,
     broadcast_room_event,
 )
+from app.services.storage import build_object_path, upload_image
+from app.services.video_extract import (
+    VideoDecodeError,
+    extract_first_frame_jpeg,
+    suffix_for,
+)
+
+_MAX_VIDEO_BYTES = 60 * 1024 * 1024  # 60MB (setlog 감성 짧은 클립 기준)
 
 router = APIRouter(prefix="/community", tags=["community"])
 
@@ -43,6 +64,24 @@ _GANGWON_BOOST = 50
 
 # --- SQL ---------------------------------------------------------------------
 _VIDEO_EXISTS = text("SELECT 1 FROM sky_videos WHERE id = :vid;")
+
+# trip 소유자 검증용
+_TRIP_OWNER = text("SELECT user_id FROM user_trips WHERE id = :trip_id;")
+
+# 영상 메타 저장(위치 = PostGIS POINT)
+_INSERT_VIDEO = text(
+    """
+    INSERT INTO sky_videos (
+        user_id, trip_id, tour_id, video_url, thumbnail_url,
+        sky_color_hex, emotion_label, geom
+    ) VALUES (
+        :user_id, :trip_id, :tour_id, :video_url, :thumbnail_url,
+        :sky_color_hex, :emotion_label,
+        ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)
+    )
+    RETURNING id, created_at;
+    """
+)
 
 # 입장: 세션 생성(중복 입장이면 하트비트만 갱신)
 _UPSERT_SESSION = text(
@@ -154,6 +193,122 @@ async def _alive_count(session: AsyncSession, sky_video_id: uuid.UUID) -> int:
 
 
 # --- 엔드포인트 ---------------------------------------------------------------
+@router.post(
+    "/videos",
+    response_model=SkyVideoCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="하늘 영상 업로드(첫 프레임 → 색상/감정 추출 → 저장)",
+)
+async def upload_sky_video(
+    video: UploadFile = File(..., description="촬영한 하늘 영상(MP4/MOV 등)"),
+    latitude: float = Form(..., description="촬영 위도", examples=[37.7725]),
+    longitude: float = Form(..., description="촬영 경도", examples=[128.9478]),
+    trip_id: int | None = Form(None, description="연결할 여정 ID(선택)"),
+    tour_id: str | None = Form(None, description="관광공사 콘텐츠 ID(선택)"),
+    user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> SkyVideoCreateResponse:
+    # 1) 좌표 검증
+    if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"status": "error", "code": "INVALID_LOCATION",
+                    "message": "잘못된 위치 정보 좌표입니다."},
+        )
+
+    # 2) 파일 검증
+    if video.content_type and not video.content_type.startswith("video/"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"status": "error", "code": "INVALID_VIDEO",
+                    "message": "영상 파일만 업로드할 수 있습니다."},
+        )
+    raw = await video.read()
+    if not raw:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"status": "error", "code": "EMPTY_VIDEO", "message": "영상이 비어 있습니다."},
+        )
+    if len(raw) > _MAX_VIDEO_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail={"status": "error", "code": "VIDEO_TOO_LARGE",
+                    "message": "영상이 너무 큽니다(최대 60MB)."},
+        )
+
+    # 3) trip_id 가 있으면 소유자 검증
+    if trip_id is not None:
+        row = (await session.execute(_TRIP_OWNER, {"trip_id": trip_id})).first()
+        if row is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"status": "error", "code": "TRIP_NOT_FOUND", "message": "여정을 찾을 수 없습니다."},
+            )
+        if str(row[0]) != str(user["user_id"]):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"status": "error", "code": "FORBIDDEN", "message": "본인의 여정만 연결할 수 있습니다."},
+            )
+
+    # 4) 첫 프레임 포착 → Phase 4 색/감정 추출 파이프라인 재사용
+    try:
+        suffix = suffix_for(video.content_type, video.filename)
+        frame_jpeg = extract_first_frame_jpeg(raw, suffix=suffix)
+    except VideoDecodeError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"status": "error", "code": "VIDEO_DECODE_ERROR", "message": "영상을 해석할 수 없습니다."},
+        )
+    try:
+        color = process_sky_image(frame_jpeg)   # EXIF 제거 + 상단 절반 K-Means
+    except ImageDecodeError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"status": "error", "code": "FRAME_DECODE_ERROR", "message": "첫 프레임을 해석할 수 없습니다."},
+        )
+
+    # 5) 스토리지 업로드 (원본 영상 + 썸네일)
+    video_ext = suffix.lstrip(".") or "mp4"
+    video_path = build_object_path(prefix="videos", ext=video_ext)
+    thumb_path = build_object_path(prefix="video_thumb", ext="jpg")
+    video_url = await upload_image(raw, video_path, video.content_type or "video/mp4")
+    thumbnail_url = await upload_image(color["jpeg_bytes"], thumb_path, "image/jpeg")
+
+    # 6) sky_videos 저장
+    row = (await session.execute(_INSERT_VIDEO, {
+        "user_id": uuid.UUID(user["user_id"]),
+        "trip_id": trip_id,
+        "tour_id": tour_id,
+        "video_url": video_url,
+        "thumbnail_url": thumbnail_url,
+        "sky_color_hex": color["dominant_hex"],
+        "emotion_label": color["emotion_label"],
+        "lng": longitude,
+        "lat": latitude,
+    })).first()
+    await session.commit()
+    sky_video_id, created_at = row[0], row[1]
+
+    # 7) 결과 반환
+    return SkyVideoCreateResponse(
+        data=SkyVideoData(
+            sky_video_id=sky_video_id,
+            trip_id=trip_id,
+            tour_id=tour_id,
+            latitude=round(latitude, 6),
+            longitude=round(longitude, 6),
+            video_url=video_url,
+            thumbnail_url=thumbnail_url,
+            sky_color_hex=color["dominant_hex"],
+            emotion_label=color["emotion_label"],
+            palette=[PaletteColor(**c) for c in color["palette"]],
+            brightness=color["brightness"],
+            sky_score=color["sky_score"],
+            created_at=created_at,
+        )
+    )
+
+
 @router.post(
     "/rooms/{sky_video_id}/join",
     response_model=RoomJoinResponse,
