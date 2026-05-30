@@ -12,8 +12,10 @@ import contextlib
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.v1 import auth, galaxy, galaxy_community, stars, tour, trip
 from app.core.config import settings
@@ -43,9 +45,47 @@ app = FastAPI(
     title=settings.APP_NAME,
     version="0.1.0",
     description="STARDUST(별의 자취) - 위치 기반 힐링 관광 서비스 백엔드 API",
-    debug=settings.DEBUG,
+    # debug=False 고정: Starlette ServerErrorMiddleware 가 클라이언트로 '스택 트레이스'를
+    # 그대로 덤프하지 못하게 막는다(민감정보·내부구조 노출 차단). 미처리 예외는 아래
+    # @app.exception_handler(Exception) 가 일관된 500 JSON 으로 응답하고, 상세는 로그로만 남긴다.
+    # (settings.DEBUG 는 DB echo 등 서버 내부 동작 제어용으로만 사용)
+    debug=False,
     lifespan=lifespan,
 )
+
+# --- 전역 예외 핸들러 -------------------------------------------------------
+# 기존 엔드포인트는 HTTPException(detail={status,code,message}) 형태로 에러를 던지고
+# FastAPI 가 이를 {"detail": {...}} 로 응답한다. 아래 핸들러도 동일하게 detail 로
+# 감싸 클라이언트(iOS) 파싱 계약을 깨지 않으면서, 422 와 미처리 500 을 방어한다.
+def _error_body(code: str, message: str, **extra) -> dict:
+    return {"detail": {"status": "error", "code": code, "message": message, **extra}}
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """타입 불일치/필드 누락 등 요청 검증 실패 → 기본 422 대신 일관된 400 envelope."""
+    errors = [
+        {"field": ".".join(str(p) for p in e.get("loc", [])), "reason": e.get("msg", "")}
+        for e in exc.errors()
+    ]
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content=_error_body("VALIDATION_ERROR", "요청 형식이 올바르지 않습니다.", errors=errors),
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """미처리 예외 catch-all → 500 스택/내부 메시지가 그대로 새어나가지 않도록 방어.
+
+    내부 상세는 서버 로그에만 남기고, 클라이언트에는 일반화된 메시지만 돌려준다.
+    """
+    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content=_error_body("INTERNAL_ERROR", "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."),
+    )
+
 
 # --- CORS ---
 app.add_middleware(

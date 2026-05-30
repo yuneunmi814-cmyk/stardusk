@@ -24,6 +24,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_current_user
+from app.core.validation import ensure_korea_coords, ensure_video_magic
 from app.db.session import get_session
 from app.schemas.community import (
     HeartbeatData,
@@ -208,15 +209,10 @@ async def upload_sky_video(
     user: dict = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> SkyVideoCreateResponse:
-    # 1) 좌표 검증
-    if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"status": "error", "code": "INVALID_LOCATION",
-                    "message": "잘못된 위치 정보 좌표입니다."},
-        )
+    # 1) 좌표 검증 (전세계 범위 + NaN/Inf + 대한민국 영토 범위)
+    ensure_korea_coords(latitude, longitude)
 
-    # 2) 파일 검증
+    # 2) 파일 검증 — Content-Type(1차) → 크기 → 매직 넘버(2차, 위장 차단)
     if video.content_type and not video.content_type.startswith("video/"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -235,6 +231,8 @@ async def upload_sky_video(
             detail={"status": "error", "code": "VIDEO_TOO_LARGE",
                     "message": "영상이 너무 큽니다(최대 60MB)."},
         )
+    # 확장자/Content-Type 만 영상인 척하는 위장 파일(.exe, 스크립트 등) 을 매직 넘버로 차단.
+    ensure_video_magic(raw, video.content_type)
 
     # 3) trip_id 가 있으면 소유자 검증
     if trip_id is not None:

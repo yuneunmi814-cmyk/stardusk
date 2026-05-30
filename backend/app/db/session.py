@@ -26,6 +26,14 @@ AsyncSessionLocal = async_sessionmaker(
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    """FastAPI 의존성: 요청 단위 세션을 제공하고 종료 시 정리한다."""
+    """FastAPI 의존성: 요청 단위 세션을 제공하고 종료 시 정리한다.
+
+    핸들러 도중 예외가 나면 명시적으로 rollback 해서, 커밋되지 않은 변경이
+    커넥션에 남거나 다음 요청에 새어나가지 않도록 방어한다.
+    """
     async with AsyncSessionLocal() as session:
-        yield session
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise

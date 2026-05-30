@@ -14,6 +14,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_current_user
+from app.core.validation import is_in_korea
 from app.db.session import get_session
 from app.schemas.trip import (
     Bounds,
@@ -138,6 +139,20 @@ async def upload_coordinates(
     session: AsyncSession = Depends(get_session),
 ) -> UploadResponse:
     await _assert_owner(session, body.trip_id, user["user_id"])
+
+    # 좌표 방어: NaN/Inf 는 Pydantic(ge/le) 에서 걸러지지만, 한국 밖 이상치는 여기서 차단.
+    #   GPS 노이즈/스푸핑으로 대한민국 영토 밖 좌표가 섞이면 동선/거리 계산이 오염되므로
+    #   배치 전체를 거부하고 어떤 점이 문제인지 알려준다.
+    for idx, c in enumerate(body.coordinates):
+        if not is_in_korea(c.latitude, c.longitude):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "status": "error",
+                    "code": "OUT_OF_SERVICE_AREA",
+                    "message": f"{idx}번째 좌표가 대한민국 영토 밖입니다. 국내 좌표만 기록할 수 있어요.",
+                },
+            )
 
     # 이어붙일 시작 sequence 계산(기존 최대값 다음부터)
     start_seq = (await session.execute(_MAX_SEQ, {"trip_id": body.trip_id})).scalar_one()

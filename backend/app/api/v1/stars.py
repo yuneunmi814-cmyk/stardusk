@@ -17,6 +17,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_current_user
+from app.core.validation import ensure_image_magic, ensure_korea_coords
 from app.db.session import get_session
 from app.schemas.star import PaletteColor, StarCreateResponse, StarData
 from app.services.color_extract import ImageDecodeError, process_sky_image
@@ -69,15 +70,10 @@ async def create_star(
     user: dict = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> StarCreateResponse:
-    # 1) 좌표 검증
-    if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"status": "error", "code": "INVALID_LOCATION",
-                    "message": "잘못된 위치 정보 좌표입니다."},
-        )
+    # 1) 좌표 검증 (전세계 범위 + NaN/Inf + 대한민국 영토 범위)
+    ensure_korea_coords(latitude, longitude)
 
-    # 2) 이미지 수신/검증
+    # 2) 이미지 수신/검증 — Content-Type(1차) → 크기 → 매직 넘버(2차, 위장 차단)
     if image.content_type and not image.content_type.startswith("image/"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -95,6 +91,8 @@ async def create_star(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail={"status": "error", "code": "IMAGE_TOO_LARGE", "message": "이미지가 너무 큽니다(최대 12MB)."},
         )
+    # 확장자/Content-Type 만 이미지인 척하는 위장 파일을 매직 넘버로 차단.
+    ensure_image_magic(raw, image.content_type)
 
     # 3) trip_id 가 있으면 소유자 검증
     if trip_id is not None:

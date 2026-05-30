@@ -5,11 +5,12 @@
 #
 # 인증: 설계서/명세서 기준 Bearer 토큰 필요(get_current_user).
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_current_user
+from app.core.validation import ensure_korea_coords
 from app.db.session import get_session
 from app.schemas.tour import TourSpotOut, TourSpotsResponse
 
@@ -50,13 +51,8 @@ async def get_nearby_spots(
     _user: dict = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> TourSpotsResponse:
-    # 좌표 유효성 검증 (명세서 400 INVALID_LOCATION)
-    if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"status": "error", "code": "INVALID_LOCATION",
-                    "message": "잘못된 위치 정보 좌표입니다."},
-        )
+    # 좌표 유효성 검증 (범위 + NaN/Inf + 대한민국 영토 범위)
+    ensure_korea_coords(latitude, longitude)
 
     result = await session.execute(
         _NEARBY_SQL, {"lng": longitude, "lat": latitude, "radius": radius, "limit": limit}
