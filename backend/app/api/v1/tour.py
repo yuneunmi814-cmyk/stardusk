@@ -7,7 +7,7 @@
 # PostGIS ST_DWithin/ST_Distance(geography 캐스팅, 미터 단위)로 GIST 인덱스를 탄다.
 # 인증: Bearer 토큰 필요(get_current_user).
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,11 +17,15 @@ from app.db.session import get_session
 from app.schemas.tour import (
     RegionGroup,
     RegionsResponse,
+    SwipeData,
+    SwipeRequest,
+    SwipeResponse,
     TourSearchData,
     TourSearchResponse,
     TourSpotOut,
     TourSpotsResponse,
 )
+from app.services import taste as taste_service
 
 router = APIRouter(prefix="/tour", tags=["tour"])
 
@@ -30,7 +34,7 @@ _NEARBY_SQL = text(
     """
     SELECT
         content_id AS tour_id,
-        spot_name, region, address, image_url,
+        spot_name, region, address, image_url, label, popularity_score,
         ST_Y(location) AS latitude,
         ST_X(location) AS longitude,
         ST_Distance(
@@ -63,6 +67,8 @@ def _row_to_spot(row, *, with_distance: bool) -> TourSpotOut:
             if with_distance and row["distance_meters"] is not None
             else None
         ),
+        label=row.get("label"),
+        popularity_score=row.get("popularity_score"),
     )
 
 
@@ -82,6 +88,48 @@ async def get_nearby_spots(
         )
     ).mappings().all()
     return TourSpotsResponse(data=[_row_to_spot(r, with_distance=True) for r in rows])
+
+
+@router.get(
+    "/deck",
+    response_model=TourSpotsResponse,
+    summary="개인화 큐레이션 덱(취향 학습 반영)",
+)
+async def get_personalized_deck(
+    latitude: float = Query(..., description="기준 위도", examples=[37.7914]),
+    longitude: float = Query(..., description="기준 경도", examples=[128.9194]),
+    radius: int = Query(5000, ge=1, le=50000, description="반경(m), 최대 50km"),
+    limit: int = Query(20, ge=1, le=100),
+    user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> TourSpotsResponse:
+    """'내 주변 별 탐색' 덱. 같은 반경 후보를 deck_rank(거리+취향 일치)로 재정렬해
+    사용자 성향에 맞는 카드를 최상단에 배치한다(§3.6③)."""
+    ensure_korea_coords(latitude, longitude)
+    rows = await taste_service.personalized_deck(
+        session, user["user_id"],
+        latitude=latitude, longitude=longitude, radius=radius, limit=limit,
+    )
+    return TourSpotsResponse(data=[_row_to_spot(r, with_distance=True) for r in rows])
+
+
+@router.post("/swipe", response_model=SwipeResponse, summary="스와이프 학습(Like/Pass/Refresh)")
+async def record_swipe(
+    payload: SwipeRequest = Body(...),
+    user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> SwipeResponse:
+    """카드 스와이프를 취향 학습에 반영한다(§3.6②). Refresh 는 '판단 보류'로 학습 제외."""
+    try:
+        result = await taste_service.apply_swipe(
+            session, user["user_id"], payload.tour_id, payload.action
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"status": "error", "code": "INVALID_SWIPE_ACTION", "message": str(e)},
+        )
+    return SwipeResponse(data=SwipeData(**result))
 
 
 @router.get("/search", response_model=TourSearchResponse, summary="통합 검색(키워드+지역 필터)")
@@ -131,6 +179,7 @@ async def search_spots(
     list_sql = text(
         f"""
         SELECT content_id AS tour_id, spot_name, region, address, image_url,
+               label, popularity_score,
                ST_Y(location) AS latitude, ST_X(location) AS longitude,
                {dist_select}
         FROM tour_spots

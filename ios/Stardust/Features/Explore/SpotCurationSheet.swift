@@ -5,6 +5,7 @@ import SwiftUI
 /// 라이크 시 onLike(spot)로 알려, 홈(스카이 뷰)에 경로 궤도를 활성화한다.
 struct SpotCurationSheet: View {
     let spots: [TourSpot]
+    @ObservedObject var vm: ExploreViewModel
     var onLike: (TourSpot) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -46,7 +47,15 @@ struct SpotCurationSheet: View {
             .frame(height: 200).frame(maxWidth: .infinity).clipped()
 
             VStack(alignment: .leading, spacing: 6) {
-                Text(spot.spotName).font(.title3.weight(.bold)).lineLimit(1)
+                HStack(spacing: 8) {
+                    Text(spot.spotName).font(.title3.weight(.bold)).lineLimit(1)
+                    if let badge = spot.tasteBadge {
+                        Label(badge.text, systemImage: badge.symbol)
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 8).padding(.vertical, 4)
+                            .background(.thinMaterial, in: Capsule())
+                    }
+                }
                 if let addr = spot.address ?? spot.region {
                     Label(addr, systemImage: "mappin").font(.subheadline)
                         .foregroundStyle(.secondary).lineLimit(1)
@@ -68,11 +77,16 @@ struct SpotCurationSheet: View {
 
     private func actions(for spot: TourSpot) -> some View {
         HStack(spacing: 26) {
-            curationButton("패스", "xmark", Color(.systemGray)) { dismiss() }
+            curationButton("패스", "xmark", Color(.systemGray)) {
+                Task { await vm.recordSwipe("pass", spot: spot) }
+                dismiss()
+            }
+            // 새로고침 = 판단 보류 → 학습 제외(§3.6②). taste_score 갱신 안 함.
             curationButton("새로고침", "arrow.clockwise", Color(hex: "#8FBEF0")) {
                 withAnimation(.spring) { index = (index + 1) % spots.count }
             }
             curationButton("라이크", "heart.fill", Color(hex: "#5794E4")) {
+                Task { await vm.recordSwipe("like", spot: spot) }
                 onLike(spot); dismiss()
             }
         }
