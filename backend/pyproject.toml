@@ -14,7 +14,6 @@ name = "stardust-backend"
 version = "0.1.0"
 description = "STARDUST(별의 자취) - 위치 기반 힐링 관광 서비스 백엔드 API"
 requires-python = ">=3.11"
-readme = "README.md"
 
 dependencies = [
     # --- 웹 프레임워크 ---
@@ -69,3 +68,8 @@ asyncio_mode = "auto"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+# 패키지 디렉터리를 명시(프로젝트명 stardust-backend ↔ 실제 패키지 app 불일치 해소).
+# 이 설정이 있어야 `pip install .`(Docker 빌드)이 app 패키지를 정상 수집한다.
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

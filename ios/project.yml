@@ -22,6 +22,11 @@ targets:
     platform: iOS
     sources:
       - path: Stardust
+    # Debug/Release 별 API 호스트는 Config/*.xcconfig 로 주입한다(소스 밖에 둬서
+    # 리소스로 포함되지 않게 한다). 값은 Info.plist 의 STARDUST_API_BASE_URL 로 흘러간다.
+    configFiles:
+      Debug: Config/Debug.xcconfig
+      Release: Config/Release.xcconfig
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.stardust.ios
@@ -30,8 +35,9 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         TARGETED_DEVICE_FAMILY: "1"
         SWIFT_EMIT_LOC_STRINGS: YES
-    # 출시 시: Apple Developer 팀을 연결하고 아래 엔타이틀먼트를 활성화한다.
-    # entitlements:
-    #   path: Stardust/Resources/Stardust.entitlements
-    #   properties:
-    #     com.apple.developer.applesignin: [Default]
+    # Sign in with Apple capability. 실기기/배포 빌드 시 Apple Developer 팀(DEVELOPMENT_TEAM)
+    # 을 설정하면 Xcode 가 자동으로 프로비저닝에 capability 를 포함한다.
+    entitlements:
+      path: Stardust/Resources/Stardust.entitlements
+      properties:
+        com.apple.developer.applesignin: [Default]

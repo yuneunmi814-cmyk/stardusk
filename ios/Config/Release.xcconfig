@@ -1,0 +1,6 @@
+// 경로: ios/Config/Release.xcconfig
+// 릴리스(App Store/TestFlight) 빌드 — 운영 백엔드 호스트를 가리킨다.
+// ⚠️ 백엔드 배포 후 실제 호스트로 교체할 것. (`//` 는 `$()` 로 끊어 표기)
+//    빌드 시 결과: https://api.stardust.app/api/v1
+
+STARDUST_API_BASE_URL = https:/$()/api.stardust.app/api/v1

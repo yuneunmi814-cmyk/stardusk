@@ -1,0 +1,7 @@
+// 경로: ios/Config/Debug.xcconfig
+// 디버그(시뮬레이터/개발) 빌드 — 로컬 백엔드를 가리킨다.
+// ⚠️ xcconfig 에서 `//` 는 주석이므로, URL 의 `//` 는 `$()` 로 끊어 표기한다.
+//    (빌드 시 빈 문자열로 치환되어 결과는 http://localhost:8000/api/v1)
+// localhost 평문 HTTP 는 Info.plist 의 NSAllowsLocalNetworking 으로만 허용된다.
+
+STARDUST_API_BASE_URL = http:/$()/localhost:8000/api/v1
