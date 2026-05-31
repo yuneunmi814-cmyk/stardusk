@@ -122,6 +122,9 @@ struct TourSpot: Decodable, Identifiable, Hashable {
     let latitude: Double
     let longitude: Double
     let distanceMeters: Int?    // 기준 좌표가 없으면 nil
+    // §3.6 성향 라벨링 — 서버 배치가 계산. nil 이면 미라벨(중립).
+    let label: String?              // "hotplace" | "secret"
+    let popularityScore: Double?    // 시군구 내 readcount 백분위(0~1)
 
     var id: String { tourId }
 
@@ -134,6 +137,21 @@ struct TourSpot: Decodable, Identifiable, Hashable {
         guard let m = distanceMeters else { return nil }
         return m >= 1000 ? String(format: "%.1fkm", Double(m) / 1000) : "\(m)m"
     }
+    /// 카드 배지용 — 핫플 / 숨은 명소 / 미라벨(nil).
+    var tasteBadge: (text: String, symbol: String)? {
+        switch label {
+        case "hotplace": return ("인기 핫플", "flame.fill")
+        case "secret":   return ("숨은 명소", "leaf.fill")
+        default:         return nil
+        }
+    }
+}
+
+/// POST /tour/swipe 응답의 data — 갱신된 취향 스코어.
+struct SwipeResult: Decodable {
+    let tasteScore: Double          // 0(숨은 명소 선호) ~ 1(핫플 선호)
+    let learned: Bool               // Refresh 는 false
+    let spotLabel: String?
 }
 
 /// GET /tour/search 의 data ({ total, items })
