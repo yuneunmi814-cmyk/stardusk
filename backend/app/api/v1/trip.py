@@ -2,7 +2,7 @@
 # 실시간 동선 수집 라우터 (Phase 3)
 #  - POST /api/v1/trip                  : 여정 시작(좌표 업로드에 쓸 trip_id 발급)
 #  - POST /api/v1/trip/coordinates      : GPS 좌표 배열 Bulk Insert + 동선/거리 갱신
-#  - GET  /api/v1/trip/{trip_id}/path   : 누적 경로를 LineString 으로 조회(+Safe Zone 난독화)
+#  - GET  /api/v1/trip/{trip_id}/path   : 누적 경로를 LineString 으로 조회
 #  - PATCH /api/v1/trip/{trip_id}/complete : 여정 종료
 #
 # 인증: 모든 엔드포인트 Bearer 토큰 필요. 본인 여정만 접근 가능.
@@ -28,7 +28,6 @@ from app.schemas.trip import (
     UploadData,
     UploadResponse,
 )
-from app.services.obfuscate import load_safe_zone, obfuscate_path
 
 router = APIRouter(prefix="/trip", tags=["trip"])
 
@@ -204,16 +203,15 @@ async def get_trip_path(
 
     rows = (await session.execute(_SELECT_COORDS, {"trip_id": trip_id})).mappings().all()
 
-    # Safe Zone 난독화 적용 (현재는 safe_center=None → 그대로 통과)
-    safe_center = await load_safe_zone(user["user_id"])
-    raw = [
-        {"sequence": r["sequence"], "latitude": r["lat"], "longitude": r["lng"],
-         "recorded_at": r["recorded_at"]}
+    coordinates = [
+        PathPoint(
+            sequence=r["sequence"],
+            latitude=r["lat"],
+            longitude=r["lng"],
+            recorded_at=r["recorded_at"],
+        )
         for r in rows
     ]
-    obfuscated = obfuscate_path(raw, safe_center=safe_center)
-
-    coordinates = [PathPoint(**c) for c in obfuscated]
 
     bounds = None
     line_geojson = None

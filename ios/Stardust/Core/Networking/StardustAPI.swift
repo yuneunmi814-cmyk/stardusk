@@ -87,6 +87,51 @@ actor StardustAPI {
         return env.data.items
     }
 
+    // MARK: 하이브리드 탐색 — 주변 명소 / 통합 검색 / 지역 목록
+    func fetchNearbySpots(lat: Double, lng: Double,
+                          radius: Int = 3000, limit: Int = 100) async throws -> [TourSpot] {
+        var comp = URLComponents(
+            url: baseURL.appendingPathComponent("tour/spots"), resolvingAgainstBaseURL: false)!
+        comp.queryItems = [
+            .init(name: "latitude", value: String(lat)),
+            .init(name: "longitude", value: String(lng)),
+            .init(name: "radius", value: String(radius)),
+            .init(name: "limit", value: String(limit)),
+        ]
+        var req = URLRequest(url: comp.url!)
+        req.httpMethod = "GET"
+        return try await run(req, as: APIEnvelope<[TourSpot]>.self).data
+    }
+
+    func searchSpots(keyword: String? = nil,
+                     province: String? = nil, city: String? = nil,
+                     lat: Double? = nil, lng: Double? = nil,
+                     limit: Int = 30, offset: Int = 0) async throws -> TourSearchData {
+        var comp = URLComponents(
+            url: baseURL.appendingPathComponent("tour/search"), resolvingAgainstBaseURL: false)!
+        var q: [URLQueryItem] = [
+            .init(name: "limit", value: String(limit)),
+            .init(name: "offset", value: String(offset)),
+        ]
+        if let keyword, !keyword.isEmpty { q.append(.init(name: "keyword", value: keyword)) }
+        if let province { q.append(.init(name: "province", value: province)) }
+        if let city { q.append(.init(name: "city", value: city)) }
+        if let lat, let lng {
+            q.append(.init(name: "latitude", value: String(lat)))
+            q.append(.init(name: "longitude", value: String(lng)))
+        }
+        comp.queryItems = q
+        var req = URLRequest(url: comp.url!)
+        req.httpMethod = "GET"
+        return try await run(req, as: APIEnvelope<TourSearchData>.self).data
+    }
+
+    func fetchRegions() async throws -> [RegionGroup] {
+        var req = URLRequest(url: baseURL.appendingPathComponent("tour/regions"))
+        req.httpMethod = "GET"
+        return try await run(req, as: APIEnvelope<[RegionGroup]>.self).data
+    }
+
     // MARK: 영상 업로드 — 영상 + 좌표만으로 '별'을 만든다. 텍스트 입력 0.
     func uploadSkyVideo(
         videoFileURL: URL,

@@ -60,7 +60,6 @@ class PathPoint(BaseModel):
     latitude: float
     longitude: float
     recorded_at: datetime
-    obfuscated: bool = False
 
 
 class Bounds(BaseModel):
