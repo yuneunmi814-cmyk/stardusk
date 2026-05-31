@@ -312,7 +312,7 @@ actor StardustAPI {
 ```
 [촬영된 영상 URL]  +  [기기 GPS 좌표]
         │
-        ▼ (Safe Zone 자동 난독화 — §3)
+        ▼ (영상 EXIF 위치 메타데이터 제거 — §3)
 [멀티파트 전송]  ──►  서버가 명소 매핑 + K-Means 색/감정 추출
         │
         ▼
@@ -374,7 +374,6 @@ final class SkyUploadViewModel: ObservableObject {
     @Published private(set) var phase: Phase = .idle
 
     private let api = StardustAPI.shared
-    private let safeZone = SafeZoneManager.shared   // §3
 
     /// 사용자에게 아무것도 묻지 않는다: 영상 + 현재 좌표만 받으면 끝.
     func publish(videoFileURL: URL,
@@ -382,13 +381,13 @@ final class SkyUploadViewModel: ObservableObject {
                  activeTripID: Int?) async {
         phase = .uploading
 
-        // ① Safe Zone 자동 난독화 (유저는 신경 쓸 필요 없음)
-        let safe = safeZone.obfuscateIfNeeded(rawCoordinate)
+        // ① 업로드 전 영상 EXIF 위치 메타데이터 제거 (§3) — 유저는 신경 쓸 필요 없음
+        let cleanURL = (try? MediaPrivacy.strippingLocationMetadata(videoFileURL)) ?? videoFileURL
 
         do {
             let video = try await api.uploadSkyVideo(
-                videoFileURL: videoFileURL,
-                coordinate: (safe.latitude, safe.longitude),
+                videoFileURL: cleanURL,
+                coordinate: (rawCoordinate.latitude, rawCoordinate.longitude),
                 tripID: activeTripID
             )
             // ② 내 아바타 별빛 즉시 갱신 (§4)
@@ -415,178 +414,50 @@ final class SkyUploadViewModel: ObservableObject {
 
 ---
 
-## 3. 최초 1회 설정으로 평생 편한 'Safe Zone' (클라이언트 자동 난독화)
+## 3. 위치 프라이버시 — 업로드 전 EXIF 메타데이터 제거
 
-> 유저는 **앱 최초 구동 시 집/회사 좌표를 한 번만** 지정한다. 이후 그 반경 200m 안에서
-> 별을 남기면, **서버로 쏘기 전에 클라이언트가 알아서** 좌표를 흐리게(grid-snap) 만든다.
-> 매번 "위치를 가릴까요?" 같은 보안 체크를 띄우지 않는다.
+> STARDUST는 별도의 'Safe Zone' 같은 사전 설정을 **요구하지 않는다.** 사용자가 신경 쓸 일은 없다.
+> 대신 **영상을 서버로 올리기 직전, 파일에 박힌 EXIF/GPS 위치 메타데이터를 자동으로 제거**한다.
+> 좌표는 오직 멀티파트 필드(`latitude`/`longitude`)로만 — 즉 **명소 매핑에 필요한 만큼만** — 전송된다.
 
-> 🔒 서버(`app/services/obfuscate.py`)와 **동일한 알고리즘**을 미러링한다:
-> **반경 200m / 격자 80m 스냅.** 클라이언트가 먼저 가리고, 서버는 2차 방어선으로 동작한다.
+> 🔒 원본 미디어 파일에 남는 촬영 위치·기기 정보가 그대로 업로드되지 않도록, 클라이언트가 1차 방어선이 된다.
+> (서버 역시 수신 후 저장 전 2차로 메타데이터를 정리한다.)
 
-### 3.1 SafeZoneManager
+### 3.1 MediaPrivacy — 업로드 전 위치 메타데이터 스트립
 
 ```swift
+import AVFoundation
 import CoreLocation
 
-final class SafeZoneManager {
-    static let shared = SafeZoneManager()
+enum MediaPrivacy {
+    /// 영상의 위치/메타데이터를 제거한 새 임시 파일 URL을 반환한다.
+    /// (AVAssetExportSession은 metadata를 명시 지정하지 않으면 원본 메타를 옮기지 않는다.)
+    static func strippingLocationMetadata(_ src: URL) throws -> URL {
+        let asset = AVURLAsset(url: src)
+        guard let export = AVAssetExportSession(
+            asset: asset, presetName: AVAssetExportPresetHighestQuality) else { return src }
 
-    // 서버와 동일 상수
-    private let safeRadiusM = 200.0
-    private let gridM = 80.0
-    private let metersPerDegLat = 111_320.0
+        let out = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension(src.pathExtension.isEmpty ? "mp4" : src.pathExtension)
 
-    private let store = UserDefaults.standard
-    private let key = "stardust.safezones.v1"
+        export.outputURL = out
+        export.outputFileType = (src.pathExtension.lowercased() == "mov") ? .mov : .mp4
+        export.metadata = []                     // ← 위치·기기 메타데이터를 의도적으로 비운다
+        export.metadataItemFilter = .forSharing  // 공유용 필터: 식별 메타 제거
 
-    struct Zone: Codable { let name: String; let lat: Double; let lng: Double }
+        let sem = DispatchSemaphore(value: 0)
+        export.exportAsynchronously { sem.signal() }
+        sem.wait()
 
-    // MARK: 최초 1회 저장 (집/회사)
-    func saveZones(_ zones: [Zone]) {
-        if let data = try? JSONEncoder().encode(zones) { store.set(data, forKey: key) }
-    }
-    var zones: [Zone] {
-        guard let data = store.data(forKey: key),
-              let z = try? JSONDecoder().decode([Zone].self, from: data) else { return [] }
-        return z
-    }
-    var hasCompletedSetup: Bool { store.bool(forKey: "stardust.safezone.setupDone") }
-    func markSetupComplete() { store.set(true, forKey: "stardust.safezone.setupDone") }
-
-    // MARK: 현재 좌표가 어떤 Safe Zone 200m 이내인지
-    private func nearestZone(to c: CLLocationCoordinate2D) -> Zone? {
-        let here = CLLocation(latitude: c.latitude, longitude: c.longitude)
-        return zones.first { z in
-            here.distance(from: CLLocation(latitude: z.lat, longitude: z.lng)) <= safeRadiusM
-        }
-    }
-
-    /// Safe Zone 안이면 격자 스냅으로 흐리게, 아니면 원본 그대로.
-    func obfuscateIfNeeded(_ c: CLLocationCoordinate2D) -> CLLocationCoordinate2D {
-        guard nearestZone(to: c) != nil else { return c }   // 밖이면 그대로
-        let gridLat = gridM / metersPerDegLat
-        let gridLng = gridM / (metersPerDegLat * max(cos(c.latitude * .pi / 180), 1e-6))
-        return CLLocationCoordinate2D(
-            latitude:  (c.latitude  / gridLat).rounded() * gridLat,
-            longitude: (c.longitude / gridLng).rounded() * gridLng
-        )
+        guard export.status == .completed else { return src } // 실패 시 원본 사용(서버 2차 방어)
+        return out
     }
 }
 ```
 
-### 3.2 최초 구동 온보딩 (한 번만 묻기)
-
-```swift
-import SwiftUI
-import MapKit
-
-struct SafeZoneSetupView: View {
-    @Environment(\.dismiss) private var dismiss
-    @State private var homeCoord: CLLocationCoordinate2D?
-
-    var body: some View {
-        VStack(spacing: 20) {
-            Text("머무는 곳을 한 번만 알려주세요")
-                .font(.title2.bold())
-            Text("집·회사 근처에서 남긴 별은 자동으로 위치를 흐리게 가려드려요.\n다신 묻지 않을게요.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            // (지도에서 한 지점 선택 → homeCoord 에 바인딩하는 MapReader 등으로 구현)
-            MapPinPicker(coordinate: $homeCoord)
-                .frame(height: 320)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-
-            Button("이 위치를 내 안전지대로 저장") {
-                guard let c = homeCoord else { return }
-                SafeZoneManager.shared.saveZones([.init(name: "집", lat: c.latitude, lng: c.longitude)])
-                SafeZoneManager.shared.markSetupComplete()
-                dismiss()
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(homeCoord == nil)
-
-            Button("나중에 할게요") { SafeZoneManager.shared.markSetupComplete(); dismiss() }
-                .font(.footnote)
-        }
-        .padding()
-    }
-}
-```
-
-### 3.3 MapPinPicker (iOS 17 `MapReader` 기반, 완성 코드)
-
-탭한 지점이든 지도 중심이든 한 번에 안전지대 좌표를 잡을 수 있게 만든 픽커.
-
-```swift
-import SwiftUI
-import MapKit
-import CoreLocation
-
-@available(iOS 17.0, *)
-struct MapPinPicker: View {
-    @Binding var coordinate: CLLocationCoordinate2D?
-
-    // 기본 카메라: 강원 강릉(서비스 주무대) 근방
-    @State private var camera: MapCameraPosition = .region(
-        MKCoordinateRegion(
-            center: CLLocationCoordinate2D(latitude: 37.7519, longitude: 128.8761),
-            span: MKCoordinateSpan(latitudeDelta: 0.03, longitudeDelta: 0.03)
-        )
-    )
-    @State private var centerCoordinate = CLLocationCoordinate2D(latitude: 37.7519, longitude: 128.8761)
-
-    var body: some View {
-        ZStack {
-            MapReader { proxy in
-                Map(position: $camera) {
-                    if let coordinate {
-                        Annotation("내 안전지대", coordinate: coordinate) {
-                            Image(systemName: "house.circle.fill")
-                                .font(.title)
-                                .foregroundStyle(.white, Color(hex: "#7FA8E0"))
-                                .shadow(radius: 4)
-                        }
-                    }
-                    UserAnnotation()   // 현재 위치 점
-                }
-                .mapControls { MapUserLocationButton(); MapCompass() }
-                // ① 지도를 탭하면 그 지점을 좌표로 변환해 선택
-                .onTapGesture { screenPoint in
-                    if let c = proxy.convert(screenPoint, from: .local) {
-                        withAnimation(.spring) { coordinate = c }
-                    }
-                }
-                // ② 카메라가 멈출 때마다 중심 좌표를 기억(중앙 핀 방식 지원)
-                .onMapCameraChange(frequency: .onEnd) { ctx in
-                    centerCoordinate = ctx.region.center
-                }
-            }
-
-            // 중앙 고정 조준 핀: 탭하지 않아도 '지도 중심'을 지정할 수 있게 한다.
-            if coordinate == nil {
-                Image(systemName: "scope")
-                    .font(.title)
-                    .foregroundStyle(Color(hex: "#7FA8E0"))
-                    .allowsHitTesting(false)
-            }
-        }
-        .overlay(alignment: .bottom) {
-            Button {
-                withAnimation(.spring) { coordinate = centerCoordinate }
-            } label: {
-                Label("이 지도 중심으로 지정", systemImage: "mappin.and.ellipse")
-                    .font(.caption.bold())
-                    .padding(.horizontal, 14).padding(.vertical, 9)
-                    .background(.ultraThinMaterial, in: Capsule())
-            }
-            .padding(.bottom, 12)
-        }
-    }
-}
-```
+> §2.2 `SkyUploadViewModel.publish(...)`가 업로드 직전 이 함수를 호출한다.
+> 사용자에게 "위치를 가릴까요?" 같은 질문은 **일절 하지 않는다** — 조용히, 자동으로 처리된다.
 
 > 지도에서 현재 위치 점(`UserAnnotation`)을 쓰려면 `CLLocationManager` 권한
 > (`NSLocationWhenInUseUsageDescription`)이 이미 허용돼 있어야 한다(§6 체크리스트).
@@ -1261,8 +1132,8 @@ final class SessionStore: ObservableObject {
     @Published private(set) var userId: String?
     @Published private(set) var nickname: String?
 
-    /// 최초 1회 Safe Zone 온보딩 시트 트리거 (부트스트랩에서 set)
-    @Published var showSafeZoneSetup = false
+    /// 최초 1회 3페이지 온보딩 노출 여부 (UserDefaults 영속)
+    @Published var needsOnboarding = !UserDefaults.standard.bool(forKey: "stardust.onboarding.done")
 
     var isAuthenticated: Bool { accessToken?.isEmpty == false }
 
@@ -1311,50 +1182,118 @@ final class SessionStore: ObservableObject {
 }
 ```
 
-### 6.3 앱 진입점 — 토큰 주입 → Safe Zone 온보딩 순서
+### 6.3 앱 진입점 — 토큰 주입 → (권한 안내·온보딩) → 위치 설정 → 우주 지도 홈
+
+진입 순서: **자동 로그인 → 로그인 → 위치 설정(스카이 뷰 홈 진입) → 듀얼 탭**. 카메라 권한은
+이 흐름 어디에서도 요청하지 않고, §7.2 도착-수집 단계에서만 켜진다.
 
 ```swift
 @main
 struct StardustApp: App {
-    @StateObject private var session = SessionStore()   // 토큰은 Keychain 에 보관
+    @StateObject private var session = SessionStore()       // 토큰은 Keychain 에 보관
+    @StateObject private var appLocation = AppLocation()    // 탐색 기준 좌표(§2 위치 설정)
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(session)
-                .task {
-                    // 1) Keychain 에 저장돼 있던 토큰을 API 액터에 주입(자동 로그인)
-                    await session.bootstrap()
-                    // 2) 최초 1회 Safe Zone 온보딩
-                    if session.isAuthenticated, !SafeZoneManager.shared.hasCompletedSetup {
-                        session.showSafeZoneSetup = true
-                    }
-                }
-                .sheet(isPresented: $session.showSafeZoneSetup) {
-                    SafeZoneSetupView()      // §3.2 — 완료 시 hasCompletedSetup = true
-                }
+                .environmentObject(appLocation)
+                .task { await session.bootstrap() }          // Keychain 토큰 → API 액터 주입
         }
     }
 }
 
-/// 인증 상태에 따라 로그인/메인을 가르는 루트.
+/// 인증 + 위치 확정 상태로 가르는 루트.
 struct RootView: View {
     @EnvironmentObject private var session: SessionStore
+    @EnvironmentObject private var appLocation: AppLocation
 
     var body: some View {
-        if session.isAuthenticated {
-            TrendingFeedView()           // §5.5 무대(피드)
+        if !session.isAuthenticated {
+            LoginView()                       // 풀블리드 밤하늘 배경 + 소셜 로그인
+        } else if session.needsOnboarding {
+            // 로그인 직후 1회: 통합 권한 안내(PrePermission) → 3페이지 온보딩 → done 플래그 저장
+            OnboardingFlowView {
+                UserDefaults.standard.set(true, forKey: "stardust.onboarding.done")
+                session.needsOnboarding = false
+            }
+        } else if !appLocation.isConfirmed {
+            LocationSetupView()               // §2 위치 설정 → confirm() 시 홈 진입
         } else {
-            LoginView()                  // Sign in with Apple → session.login(...)
+            TabView {
+                ExploreView()                 // 탐색 — 스카이 뷰가 메인 홈(§7.5)
+                TrendingFeedView()            // 무대(피드)
+                CaptureFlowView()             // 담기(수집 결과 루프)
+            }
+            .tint(.white)
         }
     }
 }
 ```
 
+**권한 획득 시퀀스(설명 우선 · 카메라 지연)**: OS 권한창 전에 목적을 설명하는 'Pre-permission' 안내를
+띄우고, 동의 시에만 시스템 권한을 요청한다. 위치=[필수], 알림=[선택], **카메라는 첫 화면에서 미요청**.
+
+```swift
+// 위치/알림 OS 권한창 전, '왜 필요한지'를 한 장에 설명하는 통합 안내 팝업.
+// (검증된 국내 앱 권한 안내 패턴: 인사 → 부제 → 권한별 가치 설명 → 단일 [확인])
+struct PrePermissionView: View {
+    var onContinue: () -> Void           // [확인] → 위치 → (선택)알림 순으로 OS 권한 요청
+
+    private struct Row { let icon: String; let tint: Color; let title: String; let desc: String }
+    private let rows = [
+        Row(icon: "location.fill", tint: .green,  title: "사용자 위치 (필수)",
+            desc: "내 주변에 뜬 별(명소)을 정확하게 찾아드려요"),
+        Row(icon: "bell.fill",     tint: .orange, title: "알림 (선택)",
+            desc: "목적지 별에 도착하면 살짝 알려드릴게요"),
+        // 카메라 행 없음 — 도착 후 [수집하기]를 누를 때만 요청
+    ]
+
+    var body: some View {
+        VStack(spacing: 20) {
+            VStack(spacing: 8) {
+                Text("안녕하세요, STARDUST예요").font(.title2.bold())
+                Text("편리한 이용을 위해 허용이 필요한 내용을 확인해 주세요")
+                    .font(.subheadline).foregroundStyle(.white.opacity(0.7))
+                    .multilineTextAlignment(.center)
+            }
+            VStack(alignment: .leading, spacing: 18) {
+                ForEach(rows.indices, id: \.self) { i in
+                    let r = rows[i]
+                    HStack(spacing: 14) {
+                        Image(systemName: r.icon).foregroundStyle(r.tint).frame(width: 28)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(r.title).font(.callout.weight(.semibold))
+                            Text(r.desc).font(.footnote).foregroundStyle(.white.opacity(0.65))
+                        }
+                    }
+                }
+            }
+            .padding(20).background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16))
+
+            Text("권한을 허용하지 않아도 서비스 이용은 가능하나, 일부 기능이 제한될 수 있어요")
+                .font(.caption).foregroundStyle(.white.opacity(0.5))
+                .multilineTextAlignment(.center)
+
+            Button("확인") { onContinue() }      // → locationProvider.requestWhenInUse() …
+                .frame(maxWidth: .infinity).frame(height: 52)
+                .background(Color(hex: "#5794E4"), in: Capsule()).foregroundStyle(.white)
+        }
+        .padding(24)
+        .background(SkyGradientBackground(mood: .night))   // 진입 배경 = 밤하늘 + 별빛 입자
+    }
+}
+```
+
+> 온보딩은 **3페이지 이내**(탐색 / 큐레이션 / 수집)로 핵심 루프만 요약하고 바로 홈에 진입시킨다.
+> 각 장은 (상)헤드라인 → (중)일러스트 → (하)보조 설명 + 도트 인디케이터 + 풀폭 CTA 구조이며,
+> **마지막 장 CTA만 `[별 보러 가기]`로 차별화**한다. 로그인·온보딩 배경은
+> `SkyGradientBackground`(§4.4) + `StarfieldOverlay`로 고정한다.
+
 ### 체크리스트 (Info.plist 권한 문구 + 필수/선택)
 - **(필수)** `NSLocationWhenInUseUsageDescription` — "당신이 머문 자리에 별을 띄우기 위해 위치를 사용해요."
 - **(필수, 도착 자동 알림용)** `NSLocationAlwaysAndWhenInUseUsageDescription` — "목적지에 도착하면 알려드리기 위해 위치를 사용해요." (백그라운드 지오펜스 → §7.2)
-- **(필수)** `NSCameraUsageDescription` — "하늘을 담기 위해 카메라를 사용해요."
+- **(키는 필수 · 요청은 지연)** `NSCameraUsageDescription` — "하늘을 담기 위해 카메라를 사용해요." (초기 진입 시 미요청 → 도착 후 `[수집하기]` 선택 시에만 요청 → 진입 장벽 0)
 - **(선택)** `NSMicrophoneUsageDescription` — "그날의 하늘과 현장음까지 생생하게 담기 위해 마이크를 사용해요."
 - **(선택, 갤러리 자동 저장 토글 ON 시)** `NSPhotoLibraryAddUsageDescription` — "담은 하늘을 사진 보관함에도 저장하기 위해 사용해요."
 - **(선택)** 알림 — Info.plist 키 없음. 런타임 `UNUserNotificationCenter.requestAuthorization` 으로 요청(도착 알림용).
