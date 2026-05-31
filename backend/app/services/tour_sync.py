@@ -104,8 +104,14 @@ async def _call(client: httpx.AsyncClient, operation: str, params: dict) -> dict
     resp.raise_for_status()
     payload = resp.json()
 
+    # data.go.kr 공통 에러는 최상위 resultCode 로(예: 잘못된 파라미터/미등록 키),
+    # 정상 응답은 response.header.resultCode 로 온다. 둘 다 검사해 조용한 0건을 막는다.
+    _ok = ("0000", "00", None)
+    top_code = payload.get("resultCode")
+    if top_code not in _ok:
+        raise RuntimeError(f"KTO API error: {top_code} {payload.get('resultMsg')}")
     header = payload.get("response", {}).get("header", {})
-    if header.get("resultCode") not in ("0000", None):
+    if header.get("resultCode") not in _ok:
         raise RuntimeError(f"KTO API error: {header.get('resultCode')} {header.get('resultMsg')}")
     return payload.get("response", {}).get("body", {})
 
@@ -215,7 +221,6 @@ async def run_area_sync(area_code: str | None = None, num_of_rows: int = 100,
                     "numOfRows": num_of_rows,
                     "pageNo": page,
                     "arrange": "C",      # C: 등록일순(이미지 포함 우선은 'O')
-                    "listYN": "Y",
                 },
             )
             items = _items(body)
