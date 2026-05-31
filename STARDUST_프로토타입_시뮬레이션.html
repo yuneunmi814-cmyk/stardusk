@@ -292,6 +292,67 @@
   .legend span{font-size:11px; color:#8e9bcc; display:flex; align-items:center; gap:6px}
   .legend .sw{width:11px;height:11px;border-radius:3px}
   footer.foot{margin-top:40px; text-align:center; color:#5f6ca0; font-size:12px; line-height:1.7}
+
+  /* ---------- consent (약관 동의) ---------- */
+  .agree-all{display:flex; align-items:center; gap:11px; background:rgba(87,148,228,.16);
+    border:1px solid rgba(87,148,228,.45); border-radius:14px; padding:14px 15px; cursor:pointer; margin-bottom:12px}
+  .agree-all b{font-size:14px}
+  .cbx{width:22px;height:22px;border-radius:7px; border:2px solid var(--glass-line); flex:none;
+    display:flex; align-items:center; justify-content:center; font-size:13px; color:transparent; background:transparent; transition:.15s}
+  .cbx.on{background:var(--accent); border-color:var(--accent); color:#fff}
+  .terms-list{display:flex; flex-direction:column; gap:8px; margin-bottom:14px}
+  .terms-row{display:flex; align-items:center; gap:11px; background:var(--glass); border:1px solid var(--glass-line);
+    border-radius:13px; padding:12px 14px; cursor:pointer; backdrop-filter:blur(6px)}
+  .terms-row .tx{flex:1}
+  .terms-row b{font-size:12.5px; font-weight:600; display:flex; align-items:center; gap:6px}
+  .terms-row p{font-size:10px; color:rgba(255,255,255,.62); margin-top:3px; line-height:1.4}
+  .terms-row .chev{color:rgba(255,255,255,.4); font-size:18px}
+  .tbadge{font-style:normal; font-size:9px; font-weight:800; padding:1px 6px; border-radius:6px}
+  .tbadge.req{background:rgba(87,148,228,.28); color:#bcd6ff; border:1px solid rgba(87,148,228,.6)}
+  .tbadge.opt{background:rgba(255,255,255,.12); color:#cdd7ff; border:1px solid var(--glass-line)}
+  .btn:disabled{opacity:.4; cursor:default}
+
+  /* ---------- onboarding pager ---------- */
+  .onb{flex:1; display:flex; flex-direction:column}
+  .onb-illust{flex:1; border-radius:22px; display:flex; align-items:center; justify-content:center;
+    font-size:62px; margin:4px 0 16px; background:rgba(255,255,255,.05); border:1px solid var(--glass-line);
+    position:relative; overflow:hidden}
+  .onb h3{font-size:19px; text-align:center; margin-bottom:8px; line-height:1.35}
+  .onb p{font-size:12px; color:#9fb0e8; text-align:center; line-height:1.55; padding:0 6px}
+  .dots{display:flex; gap:7px; justify-content:center; margin:16px 0 14px}
+  .dot{width:7px;height:7px;border-radius:50%; background:rgba(255,255,255,.25); transition:.2s}
+  .dot.on{background:var(--accent); width:20px; border-radius:5px}
+
+  /* ---------- sky view home ---------- */
+  .view-toggle{display:flex; background:rgba(10,15,34,.5); border:1px solid var(--glass-line);
+    border-radius:12px; padding:3px; gap:3px; margin:0 auto 10px; width:200px}
+  .view-toggle .opt{flex:1; text-align:center; font-size:11.5px; font-weight:600; padding:7px 0;
+    border-radius:9px; cursor:pointer; color:rgba(255,255,255,.7); transition:.15s}
+  .view-toggle .opt.on{background:var(--accent); color:#fff}
+  .sky-grid{flex:1; border-radius:20px; position:relative; overflow:hidden; margin-bottom:14px;
+    background:
+      repeating-linear-gradient(0deg, rgba(255,255,255,.05) 0 1px, transparent 1px 34px),
+      repeating-linear-gradient(90deg, rgba(255,255,255,.05) 0 1px, transparent 1px 34px),
+      linear-gradient(180deg,#0B1026 0%, #111A33 55%, #090D1C 100%)}
+  .center-star{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); z-index:6}
+  .center-star .core{width:16px;height:16px;border-radius:50%; background:#fff;
+    box-shadow:0 0 14px 4px #5794E4; margin:0 auto}
+  .center-star .halo{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:54px;height:54px;border-radius:50%; background:rgba(143,190,240,.25); filter:blur(8px);
+    animation:breathe 1.8s ease-in-out infinite}
+  .center-star .lbl{font-size:9.5px; color:rgba(255,255,255,.8); text-align:center; margin-top:22px; white-space:nowrap}
+  .spot-marker{position:absolute; transform:translate(-50%,-50%); z-index:5; text-align:center; cursor:pointer}
+  .spot-marker .sym{font-size:13px; color:#fff; text-shadow:0 0 8px #5794E4}
+  .spot-marker .nm{font-size:8.5px; color:rgba(255,255,255,.82); margin-top:1px; white-space:nowrap}
+  .orbit{position:absolute; height:1.6px; background:none; border-top:1.6px dashed rgba(143,190,240,.8);
+    transform-origin:left center; z-index:4}
+  .explore-btn{position:absolute; bottom:14px; left:50%; transform:translateX(-50%); z-index:8;
+    background:rgba(87,148,228,.92); border:1px solid rgba(255,255,255,.35); color:#fff; border-radius:24px;
+    padding:13px 22px; font-size:13.5px; font-weight:600; cursor:pointer; font-family:inherit;
+    display:flex; align-items:center; gap:7px; box-shadow:0 6px 18px rgba(87,148,228,.5)}
+  .explore-btn:active{transform:translateX(-50%) scale(.96)}
+  .taste-tag{position:absolute; top:10px; left:10px; z-index:7; background:rgba(10,15,34,.6);
+    border:1px solid var(--glass-line); border-radius:18px; padding:5px 11px; font-size:10px; color:#cdd7ff; backdrop-filter:blur(6px)}
 </style>
 </head>
 <body>
@@ -331,72 +392,87 @@
             </div>
           </div>
 
-          <!-- 1. PERMISSIONS (priming + cascade) -->
+          <!-- 1. CONSENT (약관 동의) -->
           <div class="scr" data-scr="1">
-            <div class="sky dawn"></div><div class="starfield"></div>
+            <div class="sky night"></div><div class="starfield"></div>
             <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
             <div class="content">
               <div style="text-align:center; margin:6px 0 12px">
-                <div class="tag" style="display:inline-block; background:var(--glass); border:1px solid var(--glass-line); border-radius:20px; padding:4px 12px; font-size:11px">시작 전 딱 한 번</div>
-                <h3 style="font-size:17px; margin-top:9px">STARDUST가 쓰는 권한</h3>
-                <p style="font-size:11px; color:rgba(255,255,255,.82); margin-top:4px">모두 '머문 자리를 별로 남기기' 위한 최소한이에요.</p>
+                <div class="tag" style="display:inline-block; background:var(--glass); border:1px solid var(--glass-line); border-radius:20px; padding:4px 12px; font-size:11px">회원가입 마지막 단계</div>
+                <h3 style="font-size:17px; margin-top:9px">약관에 동의해 주세요</h3>
+                <p style="font-size:11px; color:rgba(255,255,255,.82); margin-top:4px">위치 데이터를 다루는 서비스라, 아래 동의가 필요해요.</p>
+              </div>
+              <div class="agree-all" onclick="toggleAllTerms()"><span class="cbx" id="cbxAll">✓</span><b>약관 전체 동의</b></div>
+              <div class="terms-list">
+                <div class="terms-row" onclick="toggleTerm(0)"><span class="cbx" data-cb="0">✓</span><div class="tx"><b><em class="tbadge req">필수</em> 서비스 이용약관</b></div><span class="chev">›</span></div>
+                <div class="terms-row" onclick="toggleTerm(1)"><span class="cbx" data-cb="1">✓</span><div class="tx"><b><em class="tbadge req">필수</em> 개인정보 수집 및 이용</b><p>은하수 컬렉션(별자취 기록) 저장 · 계정 관리</p></div><span class="chev">›</span></div>
+                <div class="terms-row" onclick="toggleTerm(2)"><span class="cbx" data-cb="2">✓</span><div class="tx"><b><em class="tbadge req">필수</em> 위치정보서비스 이용약관</b><p>현재 위치 기반 OpenAPI 관광지 매핑 · 지오펜스 도착 알림</p></div><span class="chev">›</span></div>
+                <div class="terms-row" onclick="toggleTerm(3)"><span class="cbx" data-cb="3">✓</span><div class="tx"><b><em class="tbadge opt">선택</em> 마케팅 활용 · 개인화 푸시</b><p>취향 분석 기반 야간 별자리 추천 푸시 · 이벤트 소식</p></div><span class="chev">›</span></div>
+              </div>
+              <button class="btn btn-primary" id="consentNext" onclick="consentContinue()" disabled>다음</button>
+              <p style="font-size:9.5px; color:rgba(255,255,255,.6); text-align:center; margin-top:10px">[필수] 3종 동의 시 진행 · 동의 시각/버전은 consent_log에 기록</p>
+            </div>
+          </div>
+
+          <!-- 2. PRE-PERMISSION (안내 팝업 → OS 권한 cascade) -->
+          <div class="scr" data-scr="2">
+            <div class="sky night"></div><div class="starfield"></div>
+            <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
+            <div class="content">
+              <div style="text-align:center; margin:6px 0 12px">
+                <div class="tag" style="display:inline-block; background:var(--glass); border:1px solid var(--glass-line); border-radius:20px; padding:4px 12px; font-size:11px">안녕하세요, STARDUST예요</div>
+                <h3 style="font-size:17px; margin-top:9px">허용이 필요한 내용을 확인해 주세요</h3>
+                <p style="font-size:11px; color:rgba(255,255,255,.82); margin-top:4px">편리한 이용을 위한 안내예요. 카메라는 지금 요청하지 않아요.</p>
               </div>
               <div class="perm-list">
-                <div class="perm-row"><span>📍</span><div><b>위치 <em class="req">필수</em></b><p>머문 자리 기록 + 도착 알림(백그라운드 지오펜싱)</p></div></div>
-                <div class="perm-row"><span>📷</span><div><b>카메라 <em class="req">필수</em></b><p>하늘을 담는 셔터</p></div></div>
-                <div class="perm-row"><span>🎙️</span><div><b>마이크 <em class="opt">선택</em></b><p>그날의 현장음까지 생생하게</p></div></div>
-                <div class="perm-row"><span>🖼️</span><div><b>사진 <em class="opt">선택</em></b><p>담은 하늘을 저장·공유</p></div></div>
-                <div class="perm-row"><span>🔔</span><div><b>알림 <em class="opt">선택</em></b><p>"목적지 도착! 별자리 수집할까요?"</p></div></div>
+                <div class="perm-row"><span>📍</span><div><b>사용자 위치 <em class="req">필수</em></b><p>내 주변에 뜬 별(명소)을 정확하게 찾아드려요</p></div></div>
+                <div class="perm-row"><span>🔔</span><div><b>알림 <em class="opt">선택</em></b><p>목적지 별에 도착하면 살짝 알려드릴게요</p></div></div>
+                <div class="perm-row" style="opacity:.6"><span>📷</span><div><b>카메라 <em class="opt">요구 안 함</em></b><p>도착 후 [수집하기]를 누를 때만 요청해요</p></div></div>
               </div>
-              <button class="btn btn-primary" onclick="startPermFlow()">권한 허용하고 시작하기</button>
-              <p style="font-size:9.5px; color:rgba(255,255,255,.6); text-align:center; margin-top:10px">🛡️ 선택 권한은 거부해도 핵심 기능은 작동해요 · 광고 추적(ATT)은 미요청</p>
+              <button class="btn btn-primary" onclick="startPermFlow()">확인</button>
+              <p style="font-size:9.5px; color:rgba(255,255,255,.6); text-align:center; margin-top:10px">🛡️ 허용하지 않아도 이용 가능하나 일부 기능이 제한될 수 있어요 · 광고 추적(ATT) 미요청</p>
             </div>
             <div class="ios-dim" id="permDim" style="display:none">
               <div class="ios-alert" id="permAlert"></div>
             </div>
           </div>
 
-          <!-- 2. SAFE ZONE SETUP -->
-          <div class="scr" data-scr="2">
-            <div style="background:#0f1736; position:absolute; inset:0"></div>
-            <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
-            <div class="content">
-              <div style="text-align:center; margin-bottom:9px">
-                <div class="tag" style="display:inline-block; background:var(--glass); border:1px solid var(--glass-line); border-radius:20px; padding:4px 12px; font-size:11px">🛡️ 내 위치 보호 · 최초 1회</div>
-                <h3 style="font-size:17px; margin-top:9px">Safe Zone 지정</h3>
-                <p style="font-size:11px; color:#9fb0e8; margin-top:4px; line-height:1.5">집·직장은 가장 노출되기 쉬운 곳이에요. 한 번만 지정하면<br><b style="color:#cdd7ff">이후 200m 이내 좌표는 서버에 닿기 전 자동으로 흐려져요.</b></p>
-              </div>
-              <div class="map-area">
-                <div class="map-hint">📍 지도 중심을 우리 집/회사에 맞추세요. 반경 200m가 보호됩니다.</div>
-                <div style="position:absolute; top:30%; left:0; right:0; height:9px; background:rgba(255,255,255,.18)"></div>
-                <div style="position:absolute; top:0; bottom:0; left:62%; width:9px; background:rgba(255,255,255,.18)"></div>
-                <div class="ring"></div>
-                <div class="pin-shadow"></div>
-                <div class="center-pin">🏠</div>
-              </div>
-              <button class="btn btn-primary" onclick="go(3)">이 위치를 Safe Zone으로 지정</button>
-              <button class="btn btn-ghost" style="margin-top:8px; font-size:13px; padding:11px" onclick="skipSafeZone()">나중에 설정 · 건너뛰기</button>
-            </div>
-          </div>
-
-          <!-- 3. MAIN / SNAP -->
+          <!-- 3. ONBOARDING (3페이지) -->
           <div class="scr" data-scr="3">
-            <div class="sky day"></div><div class="starfield"></div>
+            <div class="sky night"></div><div class="starfield"></div>
             <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
             <div class="content">
-              <div class="no-search">— 검색창도, 카테고리도 없습니다 —</div>
-              <div class="cam-view">
-                <div class="focus-ring">
-                  <div class="constellation" id="constellation"></div>
-                </div>
+              <div class="onb">
+                <div class="onb-illust" id="onbIllust">🗺️</div>
+                <h3 id="onbTitle">지도로, 또 별자리로 탐색</h3>
+                <p id="onbDesc">현재 위치 기반으로 일반 지도와 우주 그리드 '스카이 뷰'를 토글하며 주변 명소를 둘러봐요.</p>
+                <div class="dots" id="onbDots"></div>
+                <button class="btn btn-primary" id="onbBtn" onclick="onbNext()">다음</button>
               </div>
-              <div class="shutter" onclick="snap()"></div>
-              <div class="snap-label">지금 이곳의 하늘을 '찰칵'<br>그게 전부예요</div>
             </div>
           </div>
 
-          <!-- 4. CURATION CARD -->
+          <!-- 4. SKY VIEW HOME (메인 홈) -->
           <div class="scr" data-scr="4">
+            <div class="statusbar" style="color:#fff"><span>9:41</span><span>📶 🔋</span></div>
+            <div class="content" style="padding-top:10px">
+              <div class="view-toggle">
+                <div class="opt on">스카이 뷰</div>
+                <div class="opt" onclick="toast('일반 지도(MapKit)로 전환 — 동일 데이터 싱크')">일반 지도</div>
+              </div>
+              <div class="sky-grid" id="skyGrid">
+                <div class="taste-tag">✨ 내 취향 정렬 · 숨은 명소 우선</div>
+                <div class="center-star">
+                  <div class="halo"></div><div class="core"></div>
+                  <div class="lbl">내 위치</div>
+                </div>
+                <div class="explore-btn" onclick="go(5)">✨ 내 주변 별 탐색</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. CURATION CARD -->
+          <div class="scr" data-scr="5">
             <div class="sky day"></div><div class="starfield"></div>
             <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
             <div class="content">
@@ -422,8 +498,8 @@
             </div>
           </div>
 
-          <!-- 5. MAP NAV -->
-          <div class="scr" data-scr="5">
+          <!-- 6. MAP NAV -->
+          <div class="scr" data-scr="6">
             <div class="statusbar" style="color:#fff"><span>9:41</span><span>📶 🔋</span></div>
             <div class="content" style="padding-top:8px">
               <div class="nav-top">
@@ -451,8 +527,8 @@
             </div>
           </div>
 
-          <!-- 6. ARRIVAL + COLLECT -->
-          <div class="scr" data-scr="6">
+          <!-- 7. ARRIVAL + COLLECT -->
+          <div class="scr" data-scr="7">
             <div class="sky sunset"></div><div class="starfield"></div>
             <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
             <div class="content">
@@ -467,18 +543,19 @@
               <div class="ios-alert">
                 <div class="body">
                   <h4>⭐ 목적지 도착</h4>
-                  <p style="margin-top:8px">목적지에 도착했습니다.<br>이 장소의 별자리를 수집할까요?</p>
+                  <p style="margin-top:8px">목적지에 도착했어요.<br>이 장소의 하늘을 담아 별자리로 수집할까요?</p>
                 </div>
                 <div class="acts">
-                  <button class="bold" onclick="collect()">수집하기</button>
+                  <button class="bold" onclick="collect()">촬영하기</button>
                   <button onclick="declineCollect()">닫기</button>
+                  <button onclick="muteToday()">오늘 하루 그만보기</button>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- 7. GALAXY COLLECTION -->
-          <div class="scr" data-scr="7">
+          <!-- 8. GALAXY COLLECTION -->
+          <div class="scr" data-scr="8">
             <div class="sky night"></div><div class="starfield"></div>
             <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
             <div class="content">
@@ -490,12 +567,12 @@
               <div class="collection">
                 <div class="grid" id="galaxyGrid"></div>
               </div>
-              <button class="btn btn-accent" onclick="go(8)" style="margin-top:14px">함께 보는 하늘 둘러보기 →</button>
+              <button class="btn btn-accent" onclick="go(9)" style="margin-top:14px">함께 보는 하늘 둘러보기 →</button>
             </div>
           </div>
 
-          <!-- 8. TRENDING FEED -->
-          <div class="scr" data-scr="8">
+          <!-- 9. TRENDING FEED -->
+          <div class="scr" data-scr="9">
             <div class="sky night"></div><div class="starfield"></div>
             <div class="statusbar"><span>9:41</span><span>📶 🔋</span></div>
             <div class="content">
@@ -557,33 +634,35 @@
 
   <footer class="foot">
     STARDUST · 별의 자취 — 2026 관광데이터 활용 공모전 출품작 프로토타입<br>
-    Snap → Swipe → Collect · 입력 Zero · Safe Zone · 강원 가중치 · K-Means 감정 색상
+    약관 동의 → 스카이 뷰 홈 → 원버튼 큐레이션(3단 스와이프) → 도착·수집 · 취향 학습 개인화 · 강원 가중치 · 업로드 전 EXIF 위치 제거
   </footer>
 </div>
 
 <script>
 const STEPS = [
-  {i:0, icon:"🍎", name:"로그인", desc:"Apple 로그인 / 게스트. access_token은 Keychain에 보관(UserDefaults X).", impl:["SessionStore","Keychain"]},
-  {i:1, icon:"🔐", name:"권한 요청 (5종)", desc:"위치(항상)·카메라·마이크·사진·알림을 맥락 설명 후 순차 요청. 광고 추적(ATT)은 미요청.", impl:["CoreLocation","AVFoundation","UserNotifications","Photos"]},
-  {i:2, icon:"🏠", name:"Safe Zone 설정", desc:"최초 1회 집/회사 핀 지정. 이후 200m 이내 좌표 자동 난독화(80m 격자).", impl:["MapReader","obfuscate"], branch:false},
-  {i:3, icon:"📸", name:"하늘 스냅숏", desc:"검색·카테고리 없음. 셔터 한 번이 서비스의 시작.", impl:["AVCapture"]},
-  {i:4, icon:"🃏", name:"명소 카드 (3액션)", desc:"OpenAPI firstimage·title·addr·overview 카드. 패스(←종료)/새로고침(다음)/라이크(→길안내).", impl:["KTO OpenAPI","ST_DWithin"], branch:true},
-  {i:5, icon:"🗺️", name:"산책 안내 + 외부 맵 전환", desc:"감각적 최소 안내(방향·남은거리·다음 한 구간). 길 헷갈리면 네이버지도·카카오맵·티맵으로 한 번 탭 전환.", impl:["MapKit MKRoute.steps","딥링크"]},
-  {i:6, icon:"⭐", name:"도착 · 수집 알림", desc:"\"이 장소의 별자리를 수집할까요?\" 강요 없는 한 줄 질문 → 하늘 카메라.", impl:["Geofencing"], branch:true},
-  {i:7, icon:"🌌", name:"은하수 컬렉션", desc:"수집 완료 시 컬렉션에 불이 들어옴. 하늘빛이 아바타 별빛으로 자동 번짐.", impl:["K-Means","sky_color_hex"]},
-  {i:8, icon:"🔥", name:"트렌딩 피드", desc:"동접+강원 가중치(+50) 정렬. 중앙 셀만 자동 무음 재생.", impl:["_GANGWON_BOOST","AVPlayer"]},
+  {i:0, icon:"🍎", name:"소셜 로그인", desc:"Apple·Google·카카오·네이버 / 게스트. access_token은 Keychain에 보관(UserDefaults X).", impl:["SessionStore","Keychain"]},
+  {i:1, icon:"📜", name:"약관 동의", desc:"전체 동의 + [필수]3종(서비스·개인정보·위치정보) / [선택]1종(마케팅·개인화 푸시). 동의 시각·버전을 consent_log에 기록.", impl:["consent_log","개인정보·위치 규제 준수"]},
+  {i:2, icon:"🔐", name:"권한 안내 (위치·알림)", desc:"가치 언어로 안내 후 위치(필수)·알림(선택)만 순차 요청. 카메라는 수집 시점에, 광고추적(ATT)은 미요청.", impl:["CoreLocation","UserNotifications"]},
+  {i:3, icon:"👋", name:"3페이지 온보딩", desc:"탐색·스와이프·은하수를 카드 3장으로 소개. 마지막 장 CTA는 [별 보러 가기].", impl:["OnboardingFlowView"]},
+  {i:4, icon:"🌌", name:"스카이 뷰 홈", desc:"우주 그리드 '스카이 뷰' ↔ 일반 지도 토글. 취향 학습 기반으로 주변 별(명소)을 정렬. [내 주변 별 탐색].", impl:["MapKit","deck_rank","개인화 정렬"]},
+  {i:5, icon:"🃏", name:"명소 카드 (3액션)", desc:"OpenAPI firstimage·title·addr·overview 카드. 패스(←종료)/새로고침(다음)/라이크(→길안내). 스와이프 자체가 취향 학습 피처.", impl:["KTO OpenAPI","taste_score EWMA"], branch:true},
+  {i:6, icon:"🗺️", name:"산책 안내 + 외부 맵", desc:"감각적 최소 안내(방향·남은거리·다음 한 구간). 길 헷갈리면 네이버지도·카카오맵·티맵으로 한 번 탭 전환.", impl:["MapKit MKRoute.steps","딥링크"]},
+  {i:7, icon:"⭐", name:"도착 · 수집", desc:"도착 시 \"하늘을 담을까요?\" 한 줄 질문 → 촬영 / 닫기 / 오늘 하루 그만보기. 업로드 전 EXIF 위치 메타데이터 제거.", impl:["Geofencing","EXIF strip"], branch:true},
+  {i:8, icon:"🌠", name:"은하수 컬렉션", desc:"수집 완료 시 컬렉션에 불이 들어옴. 하늘빛이 아바타 별빛으로 자동 번짐.", impl:["K-Means","sky_color_hex"]},
+  {i:9, icon:"🔥", name:"트렌딩 피드", desc:"동접+강원 가중치(+50) 정렬. 중앙 셀만 자동 무음 재생.", impl:["_GANGWON_BOOST","AVPlayer"]},
 ];
 
 let cur = 0, visited = new Set([0]);
-const NAMES = ["로그인","권한 요청","Safe Zone","하늘 스냅숏","명소 카드","길 안내","도착·수집","은하수","트렌딩 피드"];
+const NAMES = ["소셜 로그인","약관 동의","권한 안내","온보딩","스카이 뷰 홈","명소 카드","산책 안내","도착·수집","은하수","트렌딩 피드"];
 const CAPS = [
   "Apple·Google·카카오·네이버 로그인 — 토큰은 Keychain에 보관",
-  "위치·카메라·마이크·사진·알림 — 한 번에 (추적 식별자는 미요청)",
-  "Safe Zone — 집/회사를 한 번만 지정",
-  "셔터 한 번이 곧 시작. 검색·카테고리 없음",
-  "OpenAPI 명소 카드 — 3가지 액션만",
-  "라이크 → 즉시 지도 길 안내로 전환",
-  "도착하면 한 줄로 수집 여부만 질문",
+  "전체 동의 · [필수]3종/[선택]1종 — 동의 이력은 consent_log에 기록",
+  "위치(필수)·알림(선택)만 요청 — 카메라·추적 식별자는 미요청",
+  "탐색·스와이프·은하수 3장으로 핵심 가치 소개",
+  "스카이 뷰 ↔ 일반 지도 · 취향 학습으로 주변 별 정렬",
+  "OpenAPI 명소 카드 — 3가지 액션이 곧 취향 학습",
+  "라이크 → 즉시 산책 안내 · 외부 지도 한 번 탭 전환",
+  "도착하면 한 줄로 수집 여부만 질문 (촬영/닫기/그만보기)",
   "수집한 별자리가 은하수에 불을 켜요",
   "함께 보는 하늘 · 강원 가중치 자동재생",
 ];
@@ -694,42 +773,89 @@ function render(){
     st.classList.toggle('done', visited.has(i) && i<cur);
   });
   const cap=document.getElementById('caption');
-  cap.innerHTML=`<div class="tag">${cur+1} / 9 · ${NAMES[cur]}</div><p>${CAPS[cur]}</p>`;
+  cap.innerHTML=`<div class="tag">${cur+1} / 10 · ${NAMES[cur]}</div><p>${CAPS[cur]}</p>`;
   document.getElementById('prevBtn').disabled = cur===0;
-  document.getElementById('nextBtn').disabled = cur===8;
+  document.getElementById('nextBtn').disabled = cur===9;
   seedStars();
-  if(cur===1){ const pd=document.getElementById('permDim'); if(pd) pd.style.display='none'; }
-  if(cur===3) seedConstellation('constellation');
-  if(cur===4){ paintCard(); const card=document.getElementById('curationCard'); card.className='card card-pop'; }
-  if(cur===5){ const c=CARDS[cardIdx];
+  if(cur===1) syncConsentUI();
+  if(cur===2){ const pd=document.getElementById('permDim'); if(pd) pd.style.display='none'; }
+  if(cur===3) onbReset();
+  if(cur===4) buildSkyMarkers();
+  if(cur===5){ paintCard(); const card=document.getElementById('curationCard'); card.className='card card-pop'; }
+  if(cur===6){ const c=CARDS[cardIdx];
     document.getElementById('navDest').textContent=c.title;
     document.getElementById('navDist').textContent=fmtDist(c.dist); }
-  if(cur===6){ seedConstellation('constellation2'); document.getElementById('arrivalPop').style.display='flex';
+  if(cur===7){ seedConstellation('constellation2'); document.getElementById('arrivalPop').style.display='flex';
                const cam=document.getElementById('collectCam'); cam.classList.remove('collect-flash');
                cam.style.opacity='.4'; cam.style.filter='saturate(.55)';
                document.getElementById('collectLabel').textContent='⭐ 목적지에 도착했어요'; }
-  if(cur===7) buildGalaxy(true);
+  if(cur===8) buildGalaxy(true);
 }
 function go(i){ cur=i; visited.add(i); window.scrollTo({top:0,behavior:'smooth'}); render(); }
-function next(){ if(cur<8) go(cur+1); }
+function next(){ if(cur<9) go(cur+1); }
 function prev(){ if(cur>0) go(cur-1); }
 
-function skipSafeZone(){ go(3); }
+// ---- consent (약관 동의) ----
+const REQUIRED=[0,1,2];
+let termState=[false,false,false,false];
+function syncConsentUI(){
+  termState.forEach((v,i)=>{ const cb=document.querySelector(`.cbx[data-cb="${i}"]`); if(cb) cb.classList.toggle('on',v); });
+  document.getElementById('cbxAll').classList.toggle('on', termState.every(Boolean));
+  document.getElementById('consentNext').disabled = !REQUIRED.every(i=>termState[i]);
+}
+function toggleTerm(i){ termState[i]=!termState[i]; syncConsentUI(); }
+function toggleAllTerms(){ const all=termState.every(Boolean); termState=termState.map(()=>!all); syncConsentUI(); }
+function consentContinue(){ if(!REQUIRED.every(i=>termState[i])) return;
+  toast('동의 시각·버전을 consent_log에 기록했어요'); go(2); }
+
+// ---- onboarding pager (3페이지) ----
+const ONB=[
+  {ic:"🗺️", t:"지도로, 또 별자리로 탐색", d:"현재 위치를 기준으로 일반 지도와 우주 그리드 '스카이 뷰'를 토글하며 주변 명소를 둘러봐요."},
+  {ic:"🃏", t:"단 한 번의 스와이프", d:"검색도 입력도 없어요. 추천 카드를 패스·새로고침·라이크 하면 취향이 실시간으로 학습돼요."},
+  {ic:"🌠", t:"머문 자리마다 별이 뜹니다", d:"도착해 하늘을 담으면 나만의 은하수에 별자리가 채워지고, 그날의 하늘빛이 아바타에 번져요."},
+];
+let onbIdx=0;
+function onbReset(){ onbIdx=0; renderOnb(); }
+function renderOnb(){
+  const o=ONB[onbIdx];
+  document.getElementById('onbIllust').textContent=o.ic;
+  document.getElementById('onbTitle').textContent=o.t;
+  document.getElementById('onbDesc').textContent=o.d;
+  document.getElementById('onbDots').innerHTML=ONB.map((_,i)=>`<span class="dot ${i===onbIdx?'on':''}"></span>`).join('');
+  document.getElementById('onbBtn').textContent = onbIdx===ONB.length-1 ? '✨ 별 보러 가기' : '다음';
+}
+function onbNext(){ if(onbIdx<ONB.length-1){ onbIdx++; renderOnb(); } else { go(4); } }
+
+// ---- sky view home markers ----
+const SKY_SPOTS=[
+  {sym:"✦", nm:"경포호수광장", x:30, y:32},
+  {sym:"✧", nm:"순포해변", x:71, y:30},
+  {sym:"✦", nm:"사근진 전망대", x:66, y:68},
+  {sym:"✧", nm:"강릉아트센터", x:28, y:66},
+];
+function buildSkyMarkers(){
+  const g=document.getElementById('skyGrid'); if(!g||g.dataset.seeded) return; g.dataset.seeded=1;
+  SKY_SPOTS.forEach(s=>{
+    const dx=s.x-50, dy=s.y-50; const len=Math.sqrt(dx*dx+dy*dy);
+    const ang=Math.atan2(dy,dx)*180/Math.PI;
+    const o=document.createElement('div'); o.className='orbit';
+    o.style.left='50%'; o.style.top='50%'; o.style.width=len+'%'; o.style.transform=`rotate(${ang}deg)`;
+    g.appendChild(o);
+    const m=document.createElement('div'); m.className='spot-marker';
+    m.style.left=s.x+'%'; m.style.top=s.y+'%';
+    m.innerHTML=`<div class="sym">${s.sym}</div><div class="nm">${s.nm}</div>`;
+    m.onclick=()=>go(5);
+    g.appendChild(m);
+  });
+}
 
 // ---- permission cascade (priming → 순차 시스템 다이얼로그) ----
 const PERMS=[
-  {t:"'STARDUST'이(가) 위치에 접근하도록 허용", map:true,
-   body:"당신이 머문 자리에 별을 띄우고, 목적지 도착을 알리기 위해 위치를 사용해요.",
-   opts:["항상 허용","앱을 사용하는 동안 허용","허용 안 함"]},
-  {t:"'STARDUST'이(가) 카메라에 접근하도록 허용",
-   body:"하늘을 담기 위해 카메라를 사용해요.", opts:["허용","허용 안 함"]},
-  {t:"'STARDUST'이(가) 마이크에 접근하도록 허용",
-   body:"그날의 하늘과 현장음까지 생생하게 담기 위해 마이크를 사용해요.", opts:["허용","허용 안 함"]},
-  {t:"'STARDUST'이(가) 사진에 접근하도록 허용",
-   body:"담은 하늘을 저장하고 친구와 공유하기 위해 사진에 접근해요.",
-   opts:["전체 접근 허용","사진 선택...","허용 안 함"]},
+  {t:"'STARDUST'이(가) 위치를 사용하도록 허용", map:true,
+   body:"내 주변에 뜬 별(명소)을 정확히 찾고, 목적지 도착을 알리기 위해 위치를 사용해요.",
+   opts:["앱을 사용하는 동안 허용","한 번 허용","허용 안 함"]},
   {t:"'STARDUST'이(가) 알림을 보내도록 허용",
-   body:"목적지 도착 등 놓치면 아쉬운 순간을 알려드려요.", opts:["허용","허용 안 함"]},
+   body:"목적지 별에 도착하는 순간 등 놓치면 아쉬운 순간을 살짝 알려드려요.", opts:["허용","허용 안 함"]},
 ];
 let permIdx=0;
 function startPermFlow(){ permIdx=0; document.getElementById('permDim').style.display='flex'; renderPerm(); }
@@ -740,27 +866,25 @@ function renderPerm(){
     `<div class="body"><h4>${p.t}</h4>${p.map?'<div class="map-mini"></div>':''}<p>${p.body}</p></div><div class="acts">${acts}</div>`;
 }
 function permNext(){ permIdx++;
-  if(permIdx>=PERMS.length){ document.getElementById('permDim').style.display='none'; go(2); }
+  if(permIdx>=PERMS.length){ document.getElementById('permDim').style.display='none'; go(3); }
   else renderPerm();
 }
 
 // ---- screen interactions ----
-function snap(){ const cam=document.querySelector('[data-scr="3"] .cam-view');
-  cam.style.transition='filter .25s'; cam.style.filter='brightness(3)';
-  setTimeout(()=>{cam.style.filter='';},220);
-  setTimeout(()=>go(4),360);
-}
 function passCard(){ const c=document.getElementById('curationCard');
-  c.className='card swipe-left'; setTimeout(()=>{toast('앱이 조용히 닫혔어요 · 다음에 또 만나요');},500);
-  setTimeout(()=>{go(0); cardIdx=0;},1600);
+  c.className='card swipe-left';
+  setTimeout(()=>toast('패스 기록 · 취향 스코어(EWMA) 갱신 후 덱 종료'),450);
+  setTimeout(()=>{ cardIdx=0; go(4); },1300);
 }
 function refreshCard(){ cardIdx=(cardIdx+1)%CARDS.length;
   const c=document.getElementById('curationCard'); c.className='card';
   void c.offsetWidth; paintCard(); c.className='card card-pop';
-  toast('동일 좌표 · 다음 순위 명소로 교체');
+  toast('새로고침은 학습 제외 · 다음 순위 명소로 교체');
 }
 function likeCard(){ const c=document.getElementById('curationCard');
-  c.className='card swipe-right'; setTimeout(()=>go(5),560);
+  c.className='card swipe-right';
+  setTimeout(()=>toast('라이크 기록 · 취향 스코어 갱신'),450);
+  setTimeout(()=>go(6),900);
 }
 function openExtMap(app){
   const c=CARDS[cardIdx];
@@ -775,12 +899,16 @@ function collect(){ document.getElementById('arrivalPop').style.display='none';
   const cam=document.getElementById('collectCam');
   cam.style.opacity='1'; cam.style.filter=''; cam.classList.add('collect-flash');
   document.getElementById('collectLabel').textContent='이 장소의 하늘을 담는 중…';
-  toast('하늘을 담았어요 ✨ · 색/감정 자동 태깅');
-  setTimeout(()=>go(7),1300);
+  toast('하늘을 담았어요 ✨ · 업로드 전 EXIF 위치 제거 · 색/감정 자동 태깅');
+  setTimeout(()=>go(8),1300);
 }
 function declineCollect(){ document.getElementById('arrivalPop').style.display='none';
-  toast('수집하지 않았어요 · 홈(스냅) 화면으로 돌아갑니다');
-  setTimeout(()=>{ go(3); },1000);
+  toast('수집하지 않았어요 · 스카이 뷰 홈으로 돌아갑니다');
+  setTimeout(()=>{ go(4); },1000);
+}
+function muteToday(){ document.getElementById('arrivalPop').style.display='none';
+  toast('오늘은 도착 알림을 끌게요 · 내일 다시 켜져요');
+  setTimeout(()=>{ go(4); },1000);
 }
 let toastT;
 function toast(msg){
