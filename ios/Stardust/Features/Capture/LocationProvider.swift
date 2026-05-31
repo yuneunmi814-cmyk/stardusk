@@ -1,7 +1,7 @@
 import CoreLocation
 
 /// 업로드 시점의 현재 좌표를 '한 번만' 얻는 가벼운 래퍼.
-/// 사용자에게는 아무 입력도 요구하지 않는다 — 위치는 자동, 그 뒤 Safe Zone 난독화(§3)가 보호.
+/// 위치는 자동으로 잡되, 탐색 기준 위치는 사용자가 직접 설정/수정할 수 있다(하이브리드 탐색).
 @MainActor
 final class LocationProvider: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published private(set) var authorization: CLAuthorizationStatus

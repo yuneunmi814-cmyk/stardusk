@@ -1412,13 +1412,35 @@ final class WalkRouteVM: ObservableObject {
 
 지도에는 `route.polyline` 을 그대로 그린다(SwiftUI `Map { MapPolyline(route.polyline) }` 또는 `MKMapView.addOverlay`). 화면은 **상단 목적지·남은거리 + 다음 한 구간 + 작은 지도**면 충분하다.
 
-### 7.2 GPS 자동 도착 감지 (`CLCircularRegion` 지오펜스 → 알림)
+### 7.2 GPS 자동 도착 감지 + 알림 공해 제어 (`CLCircularRegion` 지오펜스)
 
-사용자가 "다 왔나?"를 확인할 필요가 없도록, 반경 30~50m 진입을 감지해 **도착 알림을 자동 발송**한다(여기서 §2의 위치 Always + 알림 권한이 쓰인다).
+사용자가 "다 왔나?"를 확인할 필요가 없도록, 반경 30~50m 진입을 감지해 **도착 시트를 자동 표출**한다(여기서 §2의 위치 Always + 알림 권한이 쓰인다). 핵심은 **피로감 제어**다 — 도착 팝업은 딱 3개의 버튼만 두고, 사용자가 "오늘은 그만"이라고 하면 **자정까지 침묵**한다.
+
+**도착 팝업 = 단 3개 버튼**
+
+| 버튼 | 동작 |
+|---|---|
+| `[촬영하기]` | 하늘 카메라 즉시 구동 → 별자리 수집 |
+| `[닫기]` | 이번 알림만 닫음(다음 목적지에서는 다시 뜸) |
+| `[오늘 하루 그만보기]` | 디바이스에 자정까지 mute 플래그 저장 → **오늘은 도착 팝업을 강제 호출하지 않고 백그라운드 동선만 조용히 기록** |
 
 ```swift
 import CoreLocation
 import UserNotifications
+
+/// '오늘 하루 그만보기' — 자정까지 도착 팝업을 침묵시키는 디바이스 로컬 플래그.
+enum ArrivalMute {
+    private static let key = "arrival_mute_until"
+    /// 오늘 자정(다음 날 00:00)까지 mute.
+    static func muteForToday() {
+        let midnight = Calendar.current.startOfDay(for: Date()).addingTimeInterval(86_400)
+        UserDefaults.standard.set(midnight, forKey: key)
+    }
+    static var isMuted: Bool {
+        guard let until = UserDefaults.standard.object(forKey: key) as? Date else { return false }
+        return Date() < until   // 자정 지나면 자동 해제
+    }
+}
 
 final class ArrivalGeofence: NSObject, CLLocationManagerDelegate {
     private let lm = CLLocationManager()
@@ -1432,14 +1454,20 @@ final class ArrivalGeofence: NSObject, CLLocationManagerDelegate {
     }
 
     func locationManager(_ m: CLLocationManager, didEnterRegion r: CLRegion) {
+        m.stopMonitoring(for: r)                      // 1회성
+        // mute 중이면 팝업/알림 없이 동선만 조용히 기록(알림 공해 원천 차단).
+        guard !ArrivalMute.isMuted else { return }
         let c = UNMutableNotificationContent()
         c.title = "✨ 도착했어요"; c.body = "이 자리의 하늘을 담아보세요"; c.sound = .default
+        c.categoryIdentifier = "ARRIVAL"              // 촬영/닫기/오늘 그만보기 액션 부착
         UNUserNotificationCenter.current().add(
             UNNotificationRequest(identifier: r.identifier, content: c, trigger: nil))
-        m.stopMonitoring(for: r)                      // 1회성
     }
 }
 ```
+
+> 포그라운드에서는 동일 3버튼을 `confirmationDialog`로 띄우고, `[오늘 하루 그만보기]` → `ArrivalMute.muteForToday()`.
+> 백그라운드는 `UNNotificationCategory(identifier: "ARRIVAL", actions:[촬영/닫기/오늘 그만보기])`로 같은 선택지를 잠금화면에 노출한다.
 
 ### 7.3 외부 지도 앱으로 한 번 탭 핸드오프 (도보 모드 딥링크)
 
@@ -1486,6 +1514,102 @@ enum ExternalMap {
 
 **설계 요약**: 앱 = 가벼운 산책 안내 + GPS 자동 도착 감지. 그 이상 정밀 길찾기는 사용자가 신뢰하는 국산 지도 앱에 위임 → "어설프게 흉내 내다 지는" 대신 **잘하는 건 우리가, 길찾기는 익숙한 앱이**.
 
+### 7.4 명소 카드 `[자세히 보기 🎧]` — 오디오 도슨트 바텀시트
+
+장소 카드 하단의 `[자세히 보기 🎧]`를 누르면, 빽빽한 텍스트 뷰 대신 **하단 시트(Bottom Sheet)로 오디오 가이드 플레이어**가 떠오른다. 한국관광공사 OpenAPI의 상세 설명(`overview`)과 멀티미디어 가이드(상세 이미지·오디오) 데이터를 받아, 사용자가 **폰을 보지 않고 이어폰으로 명소의 유래를 도슨트처럼 들으며 걷게** 한다. 걷는 힐링을 끊지 않는 '듣는 안내'다.
+
+```swift
+// 카드 하단 링크
+Button { showDocent = true } label: {
+    Label("자세히 보기", systemImage: "headphones").font(.callout.weight(.semibold))
+}
+.sheet(isPresented: $showDocent) {
+    DocentSheet(spot: spot)
+        .presentationDetents([.height(220), .medium])   // 살짝 떠서 산책 흐름 유지
+        .presentationDragIndicator(.visible)
+}
+```
+
+```swift
+/// 오디오 도슨트 — overview 텍스트를 AVSpeechSynthesizer로 낭독(멀티미디어 가이드 있으면 AVPlayer 재생).
+@MainActor final class DocentPlayer: ObservableObject {
+    @Published var isPlaying = false
+    private let tts = AVSpeechSynthesizer()
+
+    func play(text: String) {
+        let u = AVSpeechUtterance(string: text)
+        u.voice = AVSpeechSynthesisVoice(language: "ko-KR")
+        u.rate = 0.46
+        try? AVAudioSession.sharedInstance().setCategory(.playback)  // 백그라운드/이어폰 재생
+        tts.speak(u); isPlaying = true
+    }
+    func stop() { tts.stopSpeaking(at: .immediate); isPlaying = false }
+}
+```
+
+> 데이터 소스: `GET /tour/spots`·`/tour/search` 응답의 명소 메타데이터 + (확장) OpenAPI `detailCommon`(overview)·`detailInfo`(상세 안내). 오디오 파일이 없으면 `overview` 텍스트를 온디바이스 TTS(`AVSpeechSynthesizer`)로 낭독해 **추가 비용 없이** 도슨트 경험을 제공한다.
+
+### 7.5 메인 홈 = 스카이 뷰 + 원버튼 큐레이션 4단 플로우
+
+**스카이 뷰가 앱의 메인 홈**이다(`skyMode` 기본값 `.sky`). 상단 `[ 스카이 뷰 | 일반 지도 ]` 토글로
+현실 지도로 전환하되, **두 뷰는 스킨만 다르고 `vm.mapSpots`·기준 좌표를 그대로 공유**한다. 홈
+진입에는 **카메라 권한을 요구하지 않는다**(카메라는 §7.2 도착-수집 단계에서만 켜짐).
+
+```swift
+private enum SkyMode: String, CaseIterable { case sky = "스카이 뷰", realMap = "일반 지도" }
+@State private var skyMode: SkyMode = .sky          // 메인 홈 = 스카이 뷰
+@State private var showCuration = false
+
+Picker("뷰 전환", selection: $skyMode) {
+    ForEach(SkyMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+}
+.pickerStyle(.segmented).frame(maxWidth: 260)
+
+switch skyMode {
+case .sky:     ExploreSkyMapView(spots: vm.mapSpots,     // 우주 그리드 홈
+                                 center: appLocation.coordinate,
+                                 selectedSpot: $vm.selectedSpot,
+                                 onExplore: { showCuration = true })   // [내 주변 별 탐색]
+case .realMap: realMap                                   // MapKit + 동일 OpenAPI 마커
+}
+```
+
+**4단 마스터 플로우**: ① 우주 지도 홈 → ② 원버튼 큐레이션 → ③ 경로 매핑 → ④ 선택적 수집.
+하단 `[내 주변 별 탐색]` → 큐레이션 시트를 슬라이드 업하고, `[라이크]` 시 `selectedSpot`을 세팅하면
+홈에 점선 궤도 + 길안내 카드가 활성화된다.
+
+```swift
+.sheet(isPresented: $showCuration) {
+    SpotCurationSheet(spots: vm.mapSpots) { liked in     // [패스/새로고침/라이크]
+        withAnimation(.spring) { vm.selectedSpot = liked } // Like → 경로 궤도 + SpotCard 딥링크
+    }
+    .presentationDetents([.height(440), .large])
+}
+```
+
+**스카이 뷰 핵심**: 내 위치를 화면 중심 별로 두고, 주변 명소를 **등거리 투영**으로 별자리처럼 배치.
+선택된 명소까지 점선 궤도(`StrokeStyle(dash:)`)로 '경로 그리기'를 그어 산책 가이드를 준다.
+
+```swift
+// 중심(내 좌표) 기준 상대 벡터 → 화면 좌표(북쪽이 위). cosLat 로 경도 압축 보정.
+let cosLat = cos(center.latitude * .pi / 180)
+let dx = CGFloat(spot.longitude - center.longitude) * CGFloat(cosLat)
+let dy = CGFloat(spot.latitude  - center.latitude)
+let maxR = max(allVectors.map { hypot($0.dx, $0.dy) }.max() ?? 0.0001, 0.0001)
+let radius = min(size.width, size.height) * 0.34
+let point = CGPoint(x: origin.x + dx / maxR * radius,
+                    y: origin.y - dy / maxR * radius)   // 등거리 투영
+
+// 경로 그리기(점선 궤도)
+Path { p in p.move(to: origin); p.addLine(to: point) }
+    .stroke(Color(hex: "#8FBEF0").opacity(0.9),
+            style: StrokeStyle(lineWidth: 1.6, lineCap: .round, dash: [2, 7]))
+```
+
+배경은 `LinearGradient`(딥블루) + `GridLines` Shape(그리드) + §4.4의 `StarfieldOverlay`(반짝이는 별)를
+`TimelineView(.animation)`로 합성한다. 촬영은 §7.2 도착 팝업 `[수집하기]`에서만 `CaptureFlowView`로
+진입한다(선택적 수집). **실제 구현은 `ExploreSkyMapView.swift` · `SpotCurationSheet.swift` 참고(빌드 통과).**
+
 ---
 
 ## 8. 요약 — 이 가이드가 지킨 '귀차니즘 제로' 원칙
@@ -1494,7 +1618,8 @@ enum ExternalMap {
 |---|---|
 | 제목/감정/위치명 입력 | 서버가 좌표→명소 매핑 + K-Means 색/감정 자동 생성 |
 | 색상 고르기 | 올려다본 하늘색이 아바타 별빛으로 자동 번짐 |
-| 매번 위치 가리기 | 최초 1회 Safe Zone 지정 → 이후 200m 내 자동 난독화 |
+| 도착 알림 피로 | `[오늘 하루 그만보기]` 한 번 → 자정까지 침묵, 동선만 조용히 기록 |
+| 상세정보 읽기 | `[자세히 보기 🎧]` → 오디오 도슨트가 걸으며 들려줌 |
 | 재생 버튼 누르기 | 무대 중앙 셀이 자동 무음 재생, 벗어나면 자동 해제 |
 
 **유저는 그저 하늘을 향해 셔터를 누른다. 나머지는 STARDUST 가 알아서 별로 만든다.** ✨

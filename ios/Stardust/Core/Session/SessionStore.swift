@@ -16,9 +16,6 @@ final class SessionStore: ObservableObject {
     @Published private(set) var userId: String?
     @Published private(set) var nickname: String?
 
-    /// 최초 1회 Safe Zone 온보딩 시트 트리거 (부트스트랩에서 set)
-    @Published var showSafeZoneSetup = false
-
     var isAuthenticated: Bool { accessToken?.isEmpty == false }
 
     private let api = StardustAPI.shared

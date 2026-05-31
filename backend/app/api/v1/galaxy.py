@@ -27,7 +27,7 @@ from app.services.constellation import (
     generate_constellation_name,
     pick_dominant_emotion,
 )
-from app.services.obfuscate import haversine_m, load_safe_zone, obfuscate_point
+from app.services.geo import haversine_m
 
 router = APIRouter(prefix="/stars", tags=["galaxy"])
 
@@ -137,19 +137,18 @@ async def get_my_galaxy(
             ),
         )
 
-    # 4) Safe Zone 난독화(거주지 보호) → 난독화된 좌표 기준으로 정규화
-    safe_center = await load_safe_zone(user["user_id"])
-    stars: list[dict] = []
-    for r in rows:
-        lat, lng, _ = obfuscate_point(r["lat"], r["lng"], safe_center)
-        stars.append({
+    # 4) 별 좌표 정규화 준비 (사용자 본인의 자취만 조회하므로 좌표는 원본 그대로 사용)
+    stars: list[dict] = [
+        {
             "star_id": r["star_id"],
-            "lat": lat,
-            "lng": lng,
+            "lat": r["lat"],
+            "lng": r["lng"],
             "sky_color_hex": r["sky_color_hex"],
             "emotion_label": r["emotion_label"],
             "captured_at": r["captured_at"],
-        })
+        }
+        for r in rows
+    ]
 
     # 5) bounds 계산
     lats = [s["lat"] for s in stars]

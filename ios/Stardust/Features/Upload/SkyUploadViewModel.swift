@@ -7,7 +7,6 @@ final class SkyUploadViewModel: ObservableObject {
     @Published private(set) var phase: Phase = .idle
 
     private let api = StardustAPI.shared
-    private let safeZone = SafeZoneManager.shared   // §3
 
     /// 업로드 흐름 밖에서 실패를 표시(예: 위치 권한 거부).
     func markFailed(_ message: String) { phase = .failed(message) }
@@ -21,13 +20,10 @@ final class SkyUploadViewModel: ObservableObject {
                  activeTripID: Int?) async {
         phase = .uploading
 
-        // ① Safe Zone 자동 난독화 (유저는 신경 쓸 필요 없음)
-        let safe = safeZone.obfuscateIfNeeded(rawCoordinate)
-
         do {
             let video = try await api.uploadSkyVideo(
                 videoFileURL: videoFileURL,
-                coordinate: (safe.latitude, safe.longitude),
+                coordinate: (rawCoordinate.latitude, rawCoordinate.longitude),
                 tripID: activeTripID
             )
             // ② 내 아바타 별빛 즉시 갱신 (§4)

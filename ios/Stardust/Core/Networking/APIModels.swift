@@ -110,3 +110,41 @@ struct TrendingPage: Decodable {
     let total: Int
     let items: [TrendingItem]
 }
+
+// MARK: - 하이브리드 탐색(관광지)
+/// 지도 마커 · 리스트 행 · 장소 카드가 공유하는 단일 관광지 모델.
+struct TourSpot: Decodable, Identifiable, Hashable {
+    let tourId: String
+    let spotName: String
+    let region: String?
+    let address: String?
+    let imageUrl: String?       // KTO firstimage (빈 문자열일 수 있어 String 으로 받는다)
+    let latitude: Double
+    let longitude: Double
+    let distanceMeters: Int?    // 기준 좌표가 없으면 nil
+
+    var id: String { tourId }
+
+    var imageURL: URL? {
+        guard let s = imageUrl, !s.isEmpty else { return nil }
+        return URL(string: s)
+    }
+    /// "320m" / "1.2km" 표기. 거리 정보가 없으면 nil.
+    var distanceText: String? {
+        guard let m = distanceMeters else { return nil }
+        return m >= 1000 ? String(format: "%.1fkm", Double(m) / 1000) : "\(m)m"
+    }
+}
+
+/// GET /tour/search 의 data ({ total, items })
+struct TourSearchData: Decodable {
+    let total: Int
+    let items: [TourSpot]
+}
+
+/// GET /tour/regions 의 요소 (시/도 → 시/군/구)
+struct RegionGroup: Decodable, Identifiable, Hashable {
+    let province: String
+    let cities: [String]
+    var id: String { province }
+}
