@@ -332,6 +332,37 @@ class LiveSession(SQLModel, table=True):
     )
 
 
+class User(SQLModel, table=True):
+    """소셜 로그인 사용자. (Phase 1 인증 — Apple/Google 실제 연동)
+
+    - provider + provider_sub 의 조합이 외부 식별자(UNIQUE). 같은 사람이 다시
+      로그인하면 이 키로 조회해 동일 user_id 를 돌려준다(멱등 UPSERT).
+    - user_id(PK)는 서버가 발급하는 내부 UUID. 다른 테이블의 user_id 가 이를 가리킨다.
+    - email/name 은 Apple 이 최초 1회만 내려주므로 nullable. 닉네임은 사용자 편집 가능.
+    """
+
+    __tablename__ = "users"
+    __table_args__ = (
+        UniqueConstraint("provider", "provider_sub", name="uq_user_provider_sub"),
+    )
+
+    user_id: uuid.UUID = Field(
+        default_factory=uuid.uuid4,
+        sa_column=Column(PG_UUID(as_uuid=True), primary_key=True),
+    )
+    provider: str = Field(sa_column=Column(String(16), nullable=False))   # apple | google
+    provider_sub: str = Field(sa_column=Column(String(255), nullable=False))  # 제공자 고유 sub
+    email: Optional[str] = Field(default=None, sa_column=Column(String(320)))
+    nickname: str = Field(sa_column=Column(String(60), nullable=False))
+    created_at: Optional[datetime] = Field(
+        default=None, sa_column=Column(DateTime(timezone=True), server_default=func.now())
+    )
+    last_login_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    )
+
+
 # ---------------------------------------------------------------------------
 # §3.6 · 스와이프 행동 학습 — 사용자 취향 스코어(설문 없는 암묵적 피드백)
 # ---------------------------------------------------------------------------

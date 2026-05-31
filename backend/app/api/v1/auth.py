@@ -1,59 +1,71 @@
 # 경로: backend/app/api/v1/auth.py
-# 인증 라우터 (Phase 1 뼈대)
+# 인증 라우터 (Phase 1)
 #  - POST /api/v1/auth/login : 소셜 identity_token 검증 → 유저 UPSERT → 내부 JWT 발급
 #  - GET  /api/v1/auth/me    : 발급된 토큰으로 본인 확인 (보호 라우트 동작 검증용)
 #
-# TODO(Phase 1 완성 시):
-#   1) verify_social_token() 안의 실제 검증 로직 구현
-#      - Google: tokeninfo/JWKS 로 aud=GOOGLE_CLIENT_ID 검증
-#      - Apple : appleid JWKS 로 서명/aud=APPLE_BUNDLE_ID/iss 검증
-#   2) upsert_user() 를 실제 DB(users 테이블, SQLModel 세션)로 교체
+# 소셜 토큰 검증은 app.services.social_auth 가 Apple/Google 공개키(JWKS)로 수행한다.
+# 클라이언트가 보낸 user_id/email 은 신뢰하지 않고, 토큰 서명에서 얻은 sub 만 신뢰한다.
 
-import uuid
-
-from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends
 
 from app.core.security import create_access_token, get_current_user
+from app.db.session import get_session
 from app.schemas.auth import LoginData, LoginRequest, LoginResponse
+from app.services.social_auth import verify_social_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-# ---------------------------------------------------------------------------
-# 내부 헬퍼 (현재는 뼈대 = mock. Phase 1에서 실제 구현으로 교체)
-# ---------------------------------------------------------------------------
-async def verify_social_token(provider: str, identity_token: str) -> dict:
-    """소셜 ID 토큰을 검증하고 표준화된 사용자 클레임을 반환한다.
-
-    반환 예: {"subject": "google-uid-123", "email": "...", "name": "..."}
-    실패 시 401 을 던진다.
+# provider + provider_sub 로 기존 유저를 찾으면 닉네임/이메일/로그인시각만 갱신하고,
+# 없으면 새 user_id(UUID)를 발급해 삽입한다. RETURNING 으로 결과 행을 그대로 받는다.
+_UPSERT_USER_SQL = text(
     """
-    if not identity_token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={"status": "error", "code": "INVALID_TOKEN",
-                    "message": "유효하지 않은 인증 토큰입니다."},
+    INSERT INTO users (user_id, provider, provider_sub, email, nickname, created_at, last_login_at)
+    VALUES (gen_random_uuid(), :provider, :provider_sub, :email, :nickname, now(), now())
+    ON CONFLICT (provider, provider_sub) DO UPDATE SET
+        email        = COALESCE(EXCLUDED.email, users.email),
+        nickname     = COALESCE(NULLIF(EXCLUDED.nickname, ''), users.nickname),
+        last_login_at = now()
+    RETURNING user_id, nickname;
+    """
+)
+
+
+async def upsert_user(
+    session: AsyncSession, *, provider: str, subject: str,
+    email: str | None, nickname: str | None,
+) -> dict:
+    """users 테이블에 멱등 UPSERT. (provider, subject) 가 같으면 동일 user_id 반환."""
+    row = (
+        await session.execute(
+            _UPSERT_USER_SQL,
+            {
+                "provider": provider,
+                "provider_sub": subject,
+                "email": email,
+                "nickname": (nickname or "").strip() or "이름 없는 여행자",
+            },
         )
-    # --- 실제 구현 전 임시 처리: 토큰 자체를 식별자로 사용 ---
-    return {"subject": f"{provider}:{identity_token[:24]}", "name": None}
+    ).mappings().first()
+    await session.commit()
+    return {"user_id": str(row["user_id"]), "nickname": row["nickname"]}
 
 
-async def upsert_user(*, subject: str, nickname: str | None) -> dict:
-    """users 테이블에 유저를 생성하거나 조회한다.
-
-    Phase 1: 실제 DB 연동으로 교체. 현재는 결정적 UUID 를 생성해 mock 반환.
-    """
-    user_id = str(uuid.uuid5(uuid.NAMESPACE_URL, subject))
-    return {"user_id": user_id, "nickname": nickname or "이름 없는 여행자"}
-
-
-# ---------------------------------------------------------------------------
-# 엔드포인트
-# ---------------------------------------------------------------------------
 @router.post("/login", response_model=LoginResponse, summary="소셜 로그인 및 JWT 발급")
-async def login(body: LoginRequest) -> LoginResponse:
+async def login(
+    body: LoginRequest,
+    session: AsyncSession = Depends(get_session),
+) -> LoginResponse:
     claims = await verify_social_token(body.provider, body.identity_token)
-    user = await upsert_user(subject=claims["subject"], nickname=body.nickname)
+    user = await upsert_user(
+        session,
+        provider=body.provider,
+        subject=claims["subject"],
+        email=claims.get("email"),
+        nickname=body.nickname or claims.get("name"),
+    )
 
     access_token, expires_in = create_access_token(
         user_id=user["user_id"], nickname=user["nickname"]
