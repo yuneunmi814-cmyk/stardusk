@@ -1351,11 +1351,17 @@ struct RootView: View {
 }
 ```
 
-### 체크리스트 (Info.plist 권한 문구)
-- `NSCameraUsageDescription` — "하늘을 담기 위해 카메라를 사용해요."
-- `NSMicrophoneUsageDescription` — (영상 촬영 시) "영상 촬영에 마이크가 필요해요."
-- `NSLocationWhenInUseUsageDescription` — "당신이 머문 자리에 별을 띄우기 위해 위치를 사용해요."
-- `NSPhotoLibraryUsageDescription` — (앨범 영상 선택 시) 필요.
+### 체크리스트 (Info.plist 권한 문구 + 필수/선택)
+- **(필수)** `NSLocationWhenInUseUsageDescription` — "당신이 머문 자리에 별을 띄우기 위해 위치를 사용해요."
+- **(필수, 도착 자동 알림용)** `NSLocationAlwaysAndWhenInUseUsageDescription` — "목적지에 도착하면 알려드리기 위해 위치를 사용해요." (백그라운드 지오펜스 → §7.2)
+- **(필수)** `NSCameraUsageDescription` — "하늘을 담기 위해 카메라를 사용해요."
+- **(선택)** `NSMicrophoneUsageDescription` — "그날의 하늘과 현장음까지 생생하게 담기 위해 마이크를 사용해요."
+- **(선택, 갤러리 자동 저장 토글 ON 시)** `NSPhotoLibraryAddUsageDescription` — "담은 하늘을 사진 보관함에도 저장하기 위해 사용해요."
+- **(선택)** 알림 — Info.plist 키 없음. 런타임 `UNUserNotificationCenter.requestAuthorization` 으로 요청(도착 알림용).
+- 🚫 **광고 추적(ATT) 미사용** — `NSUserTrackingUsageDescription` 키를 두지 않는다(추적하지 않음).
+
+> 📸 **시작 스냅은 iOS '사진' 앱에 자동 저장되지 않는다.** 앱이 기본 카메라가 아니라 커스텀 `AVCaptureSession` 으로 촬영하므로, 캡처 결과는 앱 내부에만 들어온다.
+> 갤러리 자동 저장을 원하는 사용자만 **설정의 '내 사진 보관함에도 저장' 토글**을 켜고, 그때만 `PHPhotoLibrary` 로 저장한다(매번 묻지 않아 3단 스와이프 루프가 끊기지 않는다).
 
 > 🔐 보안: `access_token` 은 `UserDefaults` 가 아니라 **Keychain** 에 저장한다.
 > `SUPABASE_SERVICE_ROLE_KEY` 같은 서버 전용 키는 **iOS 앱에 절대 포함하지 않는다.**
@@ -1363,7 +1369,126 @@ struct RootView: View {
 
 ---
 
-## 7. 요약 — 이 가이드가 지킨 '귀차니즘 제로' 원칙
+## 7. 산책 안내(가벼운 길찾기) + 외부 지도 핸드오프
+
+> 목적지는 차로 가는 관광지가 아니라 **걸어서 3~5분, 100~300m 거리의 하늘 좋은 지점**이다.
+> 그래서 거창한 턴바이턴 내비를 흉내 내지 않는다. **앱은 "감각적 최소 산책 안내"만** 하고,
+> 정밀 길찾기는 사용자가 신뢰하는 **국산 지도 앱(네이버지도·카카오맵·티맵)으로 한 번 탭에 위임**한다.
+> (MapKit `MKRoute.steps` 로 구간 안내문은 실제로 제공되므로, 앱 내 최소 안내도 충분히 가능하다.)
+
+### 7.1 도보 경로 + 다음 한 구간 안내 (`MKDirections`, walking)
+
+```swift
+import MapKit
+
+@MainActor
+final class WalkRouteVM: ObservableObject {
+    @Published var route: MKRoute?
+    @Published var headlineStep: String = ""      // "북동쪽으로 230m 직진 후 우회전"
+    @Published var remainingText: String = ""     // "243m · 도보 3분"
+
+    func computeWalk(from: CLLocationCoordinate2D, to dest: CLLocationCoordinate2D) async {
+        let req = MKDirections.Request()
+        req.source      = MKMapItem(placemark: .init(coordinate: from))
+        req.destination = MKMapItem(placemark: .init(coordinate: dest))
+        req.transportType = .walking                // ← 도보 모드
+        req.requestsAlternateRoutes = false
+        do {
+            let resp = try await MKDirections(request: req).calculate()
+            guard let r = resp.routes.first else { return }
+            self.route = r
+            // 거리/시간 요약
+            let m = Int(r.distance.rounded())
+            let min = max(1, Int((r.expectedTravelTime / 60).rounded()))
+            self.remainingText = (m >= 1000 ? String(format: "%.1fkm", Double(m)/1000) : "\(m)m") + " · 도보 \(min)분"
+            // 다음 의미 있는 한 구간만 노출(첫 step 은 종종 빈 안내라 건너뜀)
+            self.headlineStep = r.steps.first(where: { !$0.instructions.isEmpty })?.instructions ?? "목적지 방향으로 이동하세요"
+        } catch {
+            self.headlineStep = ""    // 실패해도 앱은 거리/방향만으로 안내 가능 → 외부 맵 버튼이 안전망
+        }
+    }
+}
+```
+
+지도에는 `route.polyline` 을 그대로 그린다(SwiftUI `Map { MapPolyline(route.polyline) }` 또는 `MKMapView.addOverlay`). 화면은 **상단 목적지·남은거리 + 다음 한 구간 + 작은 지도**면 충분하다.
+
+### 7.2 GPS 자동 도착 감지 (`CLCircularRegion` 지오펜스 → 알림)
+
+사용자가 "다 왔나?"를 확인할 필요가 없도록, 반경 30~50m 진입을 감지해 **도착 알림을 자동 발송**한다(여기서 §2의 위치 Always + 알림 권한이 쓰인다).
+
+```swift
+import CoreLocation
+import UserNotifications
+
+final class ArrivalGeofence: NSObject, CLLocationManagerDelegate {
+    private let lm = CLLocationManager()
+
+    func arm(at dest: CLLocationCoordinate2D, id: String) {
+        lm.delegate = self
+        lm.allowsBackgroundLocationUpdates = true     // 백그라운드 도착 감지
+        let region = CLCircularRegion(center: dest, radius: 40, identifier: id)
+        region.notifyOnEntry = true; region.notifyOnExit = false
+        lm.startMonitoring(for: region)
+    }
+
+    func locationManager(_ m: CLLocationManager, didEnterRegion r: CLRegion) {
+        let c = UNMutableNotificationContent()
+        c.title = "✨ 도착했어요"; c.body = "이 자리의 하늘을 담아보세요"; c.sound = .default
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: r.identifier, content: c, trigger: nil))
+        m.stopMonitoring(for: r)                      // 1회성
+    }
+}
+```
+
+### 7.3 외부 지도 앱으로 한 번 탭 핸드오프 (도보 모드 딥링크)
+
+길이 헷갈리는 사용자는 늘 쓰던 앱으로 즉시 넘긴다. 설치 안 된 앱 버튼은 숨기고(`canOpenURL`), 폴백으로 Apple 지도(`MKMapItem.openInMaps`, 도보 모드)를 둔다.
+
+```swift
+import UIKit
+import MapKit
+
+enum ExternalMap {
+    /// 도보 길안내를 외부 앱으로 위임. dest=목적지 좌표, name=표시명.
+    static func openWalking(to dest: CLLocationCoordinate2D, name: String) -> [(label: String, action: () -> Void)] {
+        let enc = name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        var out: [(String, () -> Void)] = []
+
+        // 네이버지도: 도보 경로
+        if let u = URL(string: "nmap://route/walk?dlat=\(dest.latitude)&dlng=\(dest.longitude)&dname=\(enc)&appname=com.stardust.app"),
+           UIApplication.shared.canOpenURL(u) {
+            out.append(("네이버지도", { UIApplication.shared.open(u) }))
+        }
+        // 카카오맵: 도보 경로(FOOT)
+        if let u = URL(string: "kakaomap://route?ep=\(dest.latitude),\(dest.longitude)&by=FOOT"),
+           UIApplication.shared.canOpenURL(u) {
+            out.append(("카카오맵", { UIApplication.shared.open(u) }))
+        }
+        // 티맵: 목적지 안내
+        if let u = URL(string: "tmap://route?goalname=\(enc)&goalx=\(dest.longitude)&goaly=\(dest.latitude)"),
+           UIApplication.shared.canOpenURL(u) {
+            out.append(("티맵", { UIApplication.shared.open(u) }))
+        }
+        // 폴백: 애플 지도(항상 가능)
+        out.append(("지도", {
+            let item = MKMapItem(placemark: .init(coordinate: dest))
+            item.name = name
+            item.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeWalking])
+        }))
+        return out
+    }
+}
+```
+
+> ⚠️ 네이버/카카오/티맵 커스텀 스킴(`nmap`, `kakaomap`, `tmap`)을 `canOpenURL` 로 조회하려면
+> **Info.plist `LSApplicationQueriesSchemes`** 에 해당 스킴을 등록해야 한다.
+
+**설계 요약**: 앱 = 가벼운 산책 안내 + GPS 자동 도착 감지. 그 이상 정밀 길찾기는 사용자가 신뢰하는 국산 지도 앱에 위임 → "어설프게 흉내 내다 지는" 대신 **잘하는 건 우리가, 길찾기는 익숙한 앱이**.
+
+---
+
+## 8. 요약 — 이 가이드가 지킨 '귀차니즘 제로' 원칙
 
 | 유저가 안 하는 것 | 대신 일어나는 일 |
 |---|---|
