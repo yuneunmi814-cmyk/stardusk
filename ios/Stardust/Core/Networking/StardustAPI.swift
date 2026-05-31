@@ -103,6 +103,33 @@ actor StardustAPI {
         return try await run(req, as: APIEnvelope<[TourSpot]>.self).data
     }
 
+    // MARK: 개인화 큐레이션 — 취향 학습이 반영된 '내 주변 별 탐색' 덱
+    func fetchDeck(lat: Double, lng: Double,
+                   radius: Int = 5000, limit: Int = 20) async throws -> [TourSpot] {
+        var comp = URLComponents(
+            url: baseURL.appendingPathComponent("tour/deck"), resolvingAgainstBaseURL: false)!
+        comp.queryItems = [
+            .init(name: "latitude", value: String(lat)),
+            .init(name: "longitude", value: String(lng)),
+            .init(name: "radius", value: String(radius)),
+            .init(name: "limit", value: String(limit)),
+        ]
+        var req = URLRequest(url: comp.url!)
+        req.httpMethod = "GET"
+        return try await run(req, as: APIEnvelope<[TourSpot]>.self).data
+    }
+
+    /// 카드 스와이프(Like/Pass/Refresh)를 취향 학습에 반영. 갱신된 taste_score 반환.
+    @discardableResult
+    func postSwipe(tourId: String, action: String) async throws -> SwipeResult {
+        var req = URLRequest(url: baseURL.appendingPathComponent("tour/swipe"))
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(
+            withJSONObject: ["tour_id": tourId, "action": action])
+        return try await run(req, as: APIEnvelope<SwipeResult>.self).data
+    }
+
     func searchSpots(keyword: String? = nil,
                      province: String? = nil, city: String? = nil,
                      lat: Double? = nil, lng: Double? = nil,

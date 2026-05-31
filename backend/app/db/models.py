@@ -64,6 +64,16 @@ class TourSpot(SQLModel, table=True):
     tel: Optional[str] = Field(default=None, sa_column=Column(String(60)))
     image_url: Optional[str] = Field(default=None, sa_column=Column(Text))
 
+    # --- §3.6 성향 라벨링 (개인화 큐레이션) ---
+    # readcount:         OpenAPI 조회수(인기도 원천). 배치 동기화 시 캐싱.
+    # popularity_score:  시군구 내 readcount 백분위(0.0~1.0). 배치에서 재계산.
+    # label:             "hotplace"(인기 핫플) / "secret"(숨겨진 명소). 추천 시 즉시 조회.
+    readcount: int = Field(
+        default=0, sa_column=Column(BigInteger, nullable=False, server_default="0")
+    )
+    popularity_score: Optional[float] = Field(default=None, sa_column=Column(Float))
+    label: Optional[str] = Field(default=None, sa_column=Column(String(10), index=True))
+
     # PostGIS Point (위경도, SRID 4326)
     location: Any = Field(
         default=None,
@@ -350,4 +360,37 @@ class User(SQLModel, table=True):
     last_login_at: Optional[datetime] = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    )
+
+
+# ---------------------------------------------------------------------------
+# §3.6 · 스와이프 행동 학습 — 사용자 취향 스코어(설문 없는 암묵적 피드백)
+# ---------------------------------------------------------------------------
+class UserTaste(SQLModel, table=True):
+    """사용자별 취향 스코어. Like/Pass 스와이프로 EWMA 갱신(Refresh는 제외).
+
+    - taste_score ∈ [0(=숨은 명소 선호) … 1(=핫플 선호)], 초기값 0.5(중립).
+    - (user_id) 1행 = 한 명의 현재 취향. 추천 시점에 deck_rank 가중치로 사용.
+    - users 테이블 도입 시 user_id 를 FK 로 승격(현재 인증 mock → UUID PK).
+    """
+
+    __tablename__ = "user_taste"
+
+    user_id: uuid.UUID = Field(
+        sa_column=Column(PG_UUID(as_uuid=True), primary_key=True)
+    )
+    taste_score: float = Field(
+        default=0.5, sa_column=Column(Float, nullable=False, server_default="0.5")
+    )
+    like_count: int = Field(
+        default=0, sa_column=Column(Integer, nullable=False, server_default="0")
+    )
+    pass_count: int = Field(
+        default=0, sa_column=Column(Integer, nullable=False, server_default="0")
+    )
+    updated_at: Optional[datetime] = Field(
+        default=None,
+        sa_column=Column(
+            DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+        ),
     )

@@ -41,11 +41,11 @@ _UPSERT_SQL = text(
     INSERT INTO tour_spots (
         content_id, content_type_id, spot_name, region, address,
         area_code, sigungu_code, cat1, cat2, cat3, tel, image_url,
-        location, created_at, updated_at
+        readcount, location, created_at, updated_at
     ) VALUES (
         :content_id, :content_type_id, :spot_name, :region, :address,
         :area_code, :sigungu_code, :cat1, :cat2, :cat3, :tel, :image_url,
-        ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326), now(), now()
+        :readcount, ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326), now(), now()
     )
     ON CONFLICT (content_id) DO UPDATE SET
         content_type_id = EXCLUDED.content_type_id,
@@ -59,10 +59,38 @@ _UPSERT_SQL = text(
         cat3            = EXCLUDED.cat3,
         tel             = EXCLUDED.tel,
         image_url       = EXCLUDED.image_url,
+        readcount       = EXCLUDED.readcount,
         location        = EXCLUDED.location,
         updated_at      = now();
     """
 )
+
+# §3.6① 성향 라벨링 재계산:
+#   시군구(sigungu_code) 단위 readcount 백분위(PERCENT_RANK)로 popularity_score 산출,
+#   θ_hot(상위 분위 임계값) 이상이면 'hotplace', 아니면 'secret'.
+#   → 지역별 분포로 정규화하므로 '강원도 기준 핫플'을 공정하게 라벨링한다.
+_RELABEL_SQL = text(
+    """
+    WITH ranked AS (
+        SELECT
+            id,
+            PERCENT_RANK() OVER (
+                PARTITION BY COALESCE(sigungu_code, '_')
+                ORDER BY COALESCE(readcount, 0)
+            ) AS pr
+        FROM tour_spots
+    )
+    UPDATE tour_spots t
+    SET popularity_score = r.pr,
+        label = CASE WHEN r.pr >= :theta_hot THEN 'hotplace' ELSE 'secret' END,
+        updated_at = now()
+    FROM ranked r
+    WHERE r.id = t.id;
+    """
+)
+
+# 시군구 내 상위 (1 - θ) 비율을 'hotplace'로 본다. 0.70 → 상위 30%.
+THETA_HOT = 0.70
 
 
 # ---------------------------------------------------------------------------
@@ -112,6 +140,14 @@ def _normalize(item: dict) -> dict | None:
     if not (124.0 <= lng <= 132.0 and 33.0 <= lat <= 39.0):  # 한반도 범위 밖 좌표 제거
         return None
 
+    # readcount(조회수) — 인기도 라벨링의 원천. 누락/비정상 값은 0으로.
+    try:
+        readcount = int(float(item.get("readcount") or 0))
+        if readcount < 0:
+            readcount = 0
+    except (TypeError, ValueError):
+        readcount = 0
+
     addr = item.get("addr1") or None
     return {
         "content_id": str(item.get("contentid")),
@@ -126,6 +162,7 @@ def _normalize(item: dict) -> dict | None:
         "cat3": item.get("cat3") or None,
         "tel": (item.get("tel") or "").strip() or None,
         "image_url": item.get("firstimage") or None,
+        "readcount": readcount,
         "longitude": lng,
         "latitude": lat,
     }
@@ -142,6 +179,20 @@ async def _upsert(rows: list[dict]) -> int:
             await session.execute(_UPSERT_SQL, row)
         await session.commit()
     return len(rows)
+
+
+async def recompute_labels(theta_hot: float = THETA_HOT) -> int:
+    """시군구별 readcount 백분위로 popularity_score/label 을 일괄 재계산한다.
+
+    동기화(UPSERT) 직후 호출. 추천 시점에는 라벨이 미리 계산돼 있어 추가 연산이 없다.
+    반환값: 라벨이 갱신된 행 수.
+    """
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(_RELABEL_SQL, {"theta_hot": theta_hot})
+        await session.commit()
+        updated = result.rowcount or 0
+    logger.info("🏷️  성향 라벨 재계산 완료: %s건 (θ_hot=%.2f)", updated, theta_hot)
+    return updated
 
 
 # ---------------------------------------------------------------------------
@@ -186,6 +237,8 @@ async def run_area_sync(area_code: str | None = None, num_of_rows: int = 100,
             page += 1
 
     logger.info("✅ area=%s 동기화 완료: %s건 UPSERT", area_code, total_saved)
+    # 동기화 직후 성향 라벨(popularity_score/label) 재계산 — 추천 시점 무연산화.
+    await recompute_labels()
     return total_saved
 
 

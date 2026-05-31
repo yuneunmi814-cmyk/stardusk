@@ -17,6 +17,11 @@ class TourSpotOut(BaseModel):
     distance_meters: int | None = Field(
         default=None, description="기준 위치로부터의 거리(m). 기준 좌표가 없으면 null."
     )
+    # §3.6 성향 라벨링 — 'hotplace'(인기 핫플) / 'secret'(숨겨진 명소) / null(미라벨)
+    label: str | None = Field(default=None, description="성향 라벨(hotplace/secret)")
+    popularity_score: float | None = Field(
+        default=None, description="시군구 내 readcount 백분위(0.0~1.0)"
+    )
 
 
 class TourSpotsResponse(BaseModel):
@@ -42,3 +47,22 @@ class RegionGroup(BaseModel):
 class RegionsResponse(BaseModel):
     status: str = "success"
     data: list[RegionGroup]
+
+
+# ---- §3.6 스와이프 학습 ----
+class SwipeRequest(BaseModel):
+    tour_id: str = Field(..., description="스와이프한 명소의 콘텐츠 ID")
+    action: str = Field(..., description="like | pass | refresh", examples=["like"])
+
+
+class SwipeData(BaseModel):
+    taste_score: float = Field(
+        ..., description="갱신된 취향 스코어 0(숨은 명소 선호)~1(핫플 선호)"
+    )
+    learned: bool = Field(..., description="학습 반영 여부(Refresh 는 false)")
+    spot_label: str | None = Field(default=None, description="스와이프한 명소의 라벨")
+
+
+class SwipeResponse(BaseModel):
+    status: str = "success"
+    data: SwipeData

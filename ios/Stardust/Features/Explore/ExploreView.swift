@@ -73,7 +73,10 @@ struct ExploreMapView: View {
                         ExploreSkyMapView(spots: vm.mapSpots,
                                           center: appLocation.coordinate,
                                           selectedSpot: $vm.selectedSpot,
-                                          onExplore: { showCuration = true })
+                                          onExplore: {
+                                              showCuration = true
+                                              Task { await vm.loadDeck(center: appLocation.coordinate) }
+                                          })
                     }
                 }
                 .transition(.opacity)
@@ -97,8 +100,9 @@ struct ExploreMapView: View {
         }
         .animation(.easeInOut(duration: 0.35), value: skyMode)
         .sheet(isPresented: $showCuration) {
-            // 원버튼 큐레이션: 라이크 시 홈(스카이 뷰)에 경로 궤도 + 길안내 카드 활성화
-            SpotCurationSheet(spots: vm.mapSpots) { liked in
+            // 원버튼 큐레이션: 취향 반영 덱(deck_rank)을 우선, 비면 주변 마커로 폴백.
+            // 라이크 시 홈(스카이 뷰)에 경로 궤도 + 길안내 카드 활성화
+            SpotCurationSheet(spots: vm.deckSpots.isEmpty ? vm.mapSpots : vm.deckSpots, vm: vm) { liked in
                 withAnimation(.spring) { vm.selectedSpot = liked }
             }
             .presentationDetents([.height(440), .large])
