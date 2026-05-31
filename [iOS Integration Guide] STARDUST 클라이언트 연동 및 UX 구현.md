@@ -1549,6 +1549,53 @@ Button { showDocent = true } label: {
 
 > 데이터 소스: `GET /tour/spots`·`/tour/search` 응답의 명소 메타데이터 + (확장) OpenAPI `detailCommon`(overview)·`detailInfo`(상세 안내). 오디오 파일이 없으면 `overview` 텍스트를 온디바이스 TTS(`AVSpeechSynthesizer`)로 낭독해 **추가 비용 없이** 도슨트 경험을 제공한다.
 
+### 7.5 [지도로 탐색] 2단 토글 — 일반 지도 ↔ 스카이 뷰
+
+[지도로 탐색] 탭 상단에 `[ 일반 지도 | 스카이 뷰 ]` 토글을 둔다. **두 뷰는 스킨만 다르고
+`vm.mapSpots`(동일 OpenAPI 데이터셋)와 기준 좌표를 그대로 공유**한다. 하단 `[하늘 마주하기]`
+버튼도 공통이다.
+
+```swift
+private enum SkyMode: String, CaseIterable { case realMap = "일반 지도", sky = "스카이 뷰" }
+@State private var skyMode: SkyMode = .realMap
+
+Picker("뷰 전환", selection: $skyMode) {
+    ForEach(SkyMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+}
+.pickerStyle(.segmented).frame(maxWidth: 260)
+
+switch skyMode {
+case .realMap: realMap                                   // MapKit + OpenAPI 마커(§2 지도 탭)
+case .sky:     ExploreSkyMapView(spots: vm.mapSpots,     // 동일 데이터, 우주 그리드 스킨
+                                 center: appLocation.coordinate,
+                                 selectedSpot: $vm.selectedSpot,
+                                 onFaceTheSky: { showCapture = true })
+}
+```
+
+**스카이 뷰 핵심**: 내 위치를 화면 중심 별로 두고, 주변 명소를 **등거리 투영**으로 별자리처럼 배치.
+선택된 명소까지 점선 궤도(`StrokeStyle(dash:)`)로 '경로 그리기'를 그어 산책 가이드를 준다.
+
+```swift
+// 중심(내 좌표) 기준 상대 벡터 → 화면 좌표(북쪽이 위). cosLat 로 경도 압축 보정.
+let cosLat = cos(center.latitude * .pi / 180)
+let dx = CGFloat(spot.longitude - center.longitude) * CGFloat(cosLat)
+let dy = CGFloat(spot.latitude  - center.latitude)
+let maxR = max(allVectors.map { hypot($0.dx, $0.dy) }.max() ?? 0.0001, 0.0001)
+let radius = min(size.width, size.height) * 0.34
+let point = CGPoint(x: origin.x + dx / maxR * radius,
+                    y: origin.y - dy / maxR * radius)   // 등거리 투영
+
+// 경로 그리기(점선 궤도)
+Path { p in p.move(to: origin); p.addLine(to: point) }
+    .stroke(Color(hex: "#8FBEF0").opacity(0.9),
+            style: StrokeStyle(lineWidth: 1.6, lineCap: .round, dash: [2, 7]))
+```
+
+배경은 `LinearGradient`(딥블루) + `GridLines` Shape(그리드) + §4.4의 `StarfieldOverlay`(반짝이는 별)를
+`TimelineView(.animation)`로 합성한다. `[하늘 마주하기]`는 `fullScreenCover { CaptureFlowView() }`로
+촬영 루프에 진입한다. **실제 구현은 `ExploreSkyMapView.swift` 참고(빌드 통과).**
+
 ---
 
 ## 8. 요약 — 이 가이드가 지킨 '귀차니즘 제로' 원칙

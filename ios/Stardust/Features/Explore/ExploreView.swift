@@ -48,45 +48,77 @@ struct ExploreMapView: View {
     @ObservedObject var vm: ExploreViewModel
     @EnvironmentObject private var appLocation: AppLocation
     @State private var camera: MapCameraPosition = .automatic
+    @State private var showCapture = false
+
+    /// [지도로 탐색] 내부 2단 토글 — 화면 스킨만 바뀌고 데이터는 동일하게 싱크.
+    private enum SkyMode: String, CaseIterable { case realMap = "일반 지도", sky = "스카이 뷰" }
+    @State private var skyMode: SkyMode = .realMap
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            Map(position: $camera) {
-                UserAnnotation()
-                ForEach(vm.mapSpots) { spot in
-                    Annotation(spot.spotName,
-                               coordinate: .init(latitude: spot.latitude, longitude: spot.longitude)) {
-                        Button {
-                            withAnimation(.spring) { vm.selectedSpot = spot }
-                        } label: {
-                            Image(systemName: "star.circle.fill")
-                                .font(.title)
-                                .foregroundStyle(.white, Color(hex: "#5794E4"))
-                                .shadow(radius: 3)
-                                .scaleEffect(vm.selectedSpot == spot ? 1.25 : 1)
-                        }
+        VStack(spacing: 8) {
+            // 상단 토글: 일반 지도 ↔ 스카이 뷰
+            Picker("뷰 전환", selection: $skyMode) {
+                ForEach(SkyMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .frame(maxWidth: 260)
+            .padding(.top, 2)
+
+            ZStack(alignment: .bottom) {
+                Group {
+                    switch skyMode {
+                    case .realMap: realMap
+                    case .sky:
+                        ExploreSkyMapView(spots: vm.mapSpots,
+                                          center: appLocation.coordinate,
+                                          selectedSpot: $vm.selectedSpot,
+                                          onFaceTheSky: { showCapture = true })
+                    }
+                }
+                .transition(.opacity)
+
+                if let spot = vm.selectedSpot {
+                    SpotCardView(spot: spot) { withAnimation { vm.selectedSpot = nil } }
+                        .padding(.horizontal, 14).padding(.bottom, 12)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+
+                if vm.mapSpots.isEmpty && !vm.isLoading {
+                    Text("주변에 표시할 명소가 없어요")
+                        .font(.footnote).foregroundStyle(.secondary)
+                        .padding(10).background(.regularMaterial, in: Capsule())
+                        .padding(.bottom, 24)
+                }
+            }
+            .overlay(alignment: .top) {
+                if vm.isLoading { ProgressView().padding(8).background(.regularMaterial, in: Capsule()) }
+            }
+        }
+        .animation(.easeInOut(duration: 0.35), value: skyMode)
+        .fullScreenCover(isPresented: $showCapture) { CaptureFlowView() }
+    }
+
+    // 일반 지도 뷰 — 네이티브 현실 지도 + OpenAPI 관광지 마커
+    private var realMap: some View {
+        Map(position: $camera) {
+            UserAnnotation()
+            ForEach(vm.mapSpots) { spot in
+                Annotation(spot.spotName,
+                           coordinate: .init(latitude: spot.latitude, longitude: spot.longitude)) {
+                    Button {
+                        withAnimation(.spring) { vm.selectedSpot = spot }
+                    } label: {
+                        Image(systemName: "star.circle.fill")
+                            .font(.title)
+                            .foregroundStyle(.white, Color(hex: "#5794E4"))
+                            .shadow(radius: 3)
+                            .scaleEffect(vm.selectedSpot == spot ? 1.25 : 1)
                     }
                 }
             }
-            .mapControls { MapUserLocationButton(); MapCompass() }
-            .onAppear { recenter() }
-
-            if let spot = vm.selectedSpot {
-                SpotCardView(spot: spot) { withAnimation { vm.selectedSpot = nil } }
-                    .padding(.horizontal, 14).padding(.bottom, 12)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-
-            if vm.mapSpots.isEmpty && !vm.isLoading {
-                Text("주변에 표시할 명소가 없어요")
-                    .font(.footnote).foregroundStyle(.secondary)
-                    .padding(10).background(.regularMaterial, in: Capsule())
-                    .padding(.bottom, 24)
-            }
         }
-        .overlay(alignment: .top) {
-            if vm.isLoading { ProgressView().padding(8).background(.regularMaterial, in: Capsule()) }
-        }
+        .mapControls { MapUserLocationButton(); MapCompass() }
+        .onAppear { recenter() }
     }
 
     private func recenter() {
