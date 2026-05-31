@@ -66,5 +66,17 @@
 		<string>kakaomap</string>
 		<string>tmap</string>
 	</array>
+
+	<!-- ===== 백엔드 Base URL (빌드 구성별: Config/*.xcconfig 에서 주입) ===== -->
+	<key>STARDUST_API_BASE_URL</key>
+	<string>$(STARDUST_API_BASE_URL)</string>
+
+	<!-- ===== App Transport Security ===== -->
+	<!-- 운영 트래픽은 HTTPS 강제. 개발용 localhost 평문 HTTP 만 예외 허용. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 </dict>
 </plist>

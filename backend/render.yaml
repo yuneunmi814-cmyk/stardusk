@@ -1,0 +1,53 @@
+# 경로: backend/render.yaml
+# Render(https://render.com) 배포용 Blueprint — "한 옵션"일 뿐, Dockerfile 은 호스트
+# 비종속이라 Fly.io/Railway/Cloud Run 등 어디서든 그대로 쓸 수 있다.
+#
+# 사용법:
+#   1) Render 대시보드 → New → Blueprint → 이 레포 연결
+#   2) 아래 sync:false 환경변수(시크릿)를 대시보드에서 실제 값으로 입력
+#      - DATABASE_URL: Supabase 연결 문자열(postgresql+asyncpg://...). PostGIS 포함.
+#      - JWT_SECRET:   강력한 무작위 값
+#      - APPLE_BUNDLE_ID = app.stardust.ios
+#      - SUPABASE_*, KTO_SERVICE_KEY 등
+#   * DB 는 Supabase 를 그대로 쓰므로 Render 관리형 DB 는 만들지 않는다.
+#   * 블루프린트는 레포 루트의 render.yaml 을 읽는다 — 루트로 옮기거나 rootDir 설정.
+
+services:
+  - type: web
+    name: stardust-api
+    runtime: docker
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: WEB_CONCURRENCY
+        value: "2"
+      - key: RUN_MIGRATIONS
+        value: "1"
+      # ---- 시크릿: 대시보드에서 입력(레포에 값 저장 금지) ----
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: APPLE_BUNDLE_ID
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        sync: false
+      - key: KTO_SERVICE_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
