@@ -9,7 +9,8 @@ struct ExploreSkyMapView: View {
     let spots: [TourSpot]
     let center: CLLocationCoordinate2D
     @Binding var selectedSpot: TourSpot?
-    var onFaceTheSky: () -> Void
+    /// 하단 메인 버튼 — 원버튼 큐레이션 시트 호출.
+    var onExplore: () -> Void
 
     var body: some View {
         GeometryReader { geo in
@@ -37,10 +38,10 @@ struct ExploreSkyMapView: View {
                 // 내 위치 = 중심 별
                 CenterStar().position(origin)
 
-                // 하단 중앙 [하늘 마주하기]
+                // 하단 중앙 [내 주변 별 탐색] — 원버튼 큐레이션
                 VStack {
                     Spacer()
-                    FaceTheSkyButton(action: onFaceTheSky).padding(.bottom, 28)
+                    ExploreNearbyButton(action: onExplore).padding(.bottom, 28)
                 }
             }
         }
@@ -156,20 +157,21 @@ private struct SkySpotMarker: View {
     }
 }
 
-// MARK: - 하늘 마주하기 버튼
+// MARK: - 내 주변 별 탐색 버튼(원버튼 큐레이션 호출)
 
-private struct FaceTheSkyButton: View {
+private struct ExploreNearbyButton: View {
     var action: () -> Void
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 6) {
-                ZStack {
-                    Circle().fill(.ultraThinMaterial).frame(width: 64, height: 64)
-                    Circle().stroke(Color.white.opacity(0.5), lineWidth: 1).frame(width: 64, height: 64)
-                    Image(systemName: "arrow.up").font(.title2.weight(.semibold)).foregroundStyle(.white)
-                }
-                Text("하늘 마주하기").font(.caption.weight(.semibold)).foregroundStyle(.white.opacity(0.9))
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles").font(.headline)
+                Text("내 주변 별 탐색").font(.callout.weight(.semibold))
             }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 22).frame(height: 52)
+            .background(Color(hex: "#5794E4").opacity(0.92), in: Capsule())
+            .overlay(Capsule().stroke(Color.white.opacity(0.35), lineWidth: 1))
+            .shadow(color: Color(hex: "#5794E4").opacity(0.5), radius: 12, y: 4)
         }
         .buttonStyle(.plain)
     }

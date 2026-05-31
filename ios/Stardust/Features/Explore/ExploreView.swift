@@ -48,11 +48,12 @@ struct ExploreMapView: View {
     @ObservedObject var vm: ExploreViewModel
     @EnvironmentObject private var appLocation: AppLocation
     @State private var camera: MapCameraPosition = .automatic
-    @State private var showCapture = false
+    @State private var showCuration = false
 
     /// [지도로 탐색] 내부 2단 토글 — 화면 스킨만 바뀌고 데이터는 동일하게 싱크.
-    private enum SkyMode: String, CaseIterable { case realMap = "일반 지도", sky = "스카이 뷰" }
-    @State private var skyMode: SkyMode = .realMap
+    /// 스카이 뷰가 앱의 메인 홈 비주얼이므로 기본값으로 고정.
+    private enum SkyMode: String, CaseIterable { case sky = "스카이 뷰", realMap = "일반 지도" }
+    @State private var skyMode: SkyMode = .sky
 
     var body: some View {
         VStack(spacing: 8) {
@@ -72,7 +73,7 @@ struct ExploreMapView: View {
                         ExploreSkyMapView(spots: vm.mapSpots,
                                           center: appLocation.coordinate,
                                           selectedSpot: $vm.selectedSpot,
-                                          onFaceTheSky: { showCapture = true })
+                                          onExplore: { showCuration = true })
                     }
                 }
                 .transition(.opacity)
@@ -95,7 +96,14 @@ struct ExploreMapView: View {
             }
         }
         .animation(.easeInOut(duration: 0.35), value: skyMode)
-        .fullScreenCover(isPresented: $showCapture) { CaptureFlowView() }
+        .sheet(isPresented: $showCuration) {
+            // 원버튼 큐레이션: 라이크 시 홈(스카이 뷰)에 경로 궤도 + 길안내 카드 활성화
+            SpotCurationSheet(spots: vm.mapSpots) { liked in
+                withAnimation(.spring) { vm.selectedSpot = liked }
+            }
+            .presentationDetents([.height(440), .large])
+            .presentationDragIndicator(.visible)
+        }
     }
 
     // 일반 지도 뷰 — 네이티브 현실 지도 + OpenAPI 관광지 마커

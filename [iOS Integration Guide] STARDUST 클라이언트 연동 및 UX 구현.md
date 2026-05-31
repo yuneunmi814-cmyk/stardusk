@@ -1549,15 +1549,16 @@ Button { showDocent = true } label: {
 
 > 데이터 소스: `GET /tour/spots`·`/tour/search` 응답의 명소 메타데이터 + (확장) OpenAPI `detailCommon`(overview)·`detailInfo`(상세 안내). 오디오 파일이 없으면 `overview` 텍스트를 온디바이스 TTS(`AVSpeechSynthesizer`)로 낭독해 **추가 비용 없이** 도슨트 경험을 제공한다.
 
-### 7.5 [지도로 탐색] 2단 토글 — 일반 지도 ↔ 스카이 뷰
+### 7.5 메인 홈 = 스카이 뷰 + 원버튼 큐레이션 4단 플로우
 
-[지도로 탐색] 탭 상단에 `[ 일반 지도 | 스카이 뷰 ]` 토글을 둔다. **두 뷰는 스킨만 다르고
-`vm.mapSpots`(동일 OpenAPI 데이터셋)와 기준 좌표를 그대로 공유**한다. 하단 `[하늘 마주하기]`
-버튼도 공통이다.
+**스카이 뷰가 앱의 메인 홈**이다(`skyMode` 기본값 `.sky`). 상단 `[ 스카이 뷰 | 일반 지도 ]` 토글로
+현실 지도로 전환하되, **두 뷰는 스킨만 다르고 `vm.mapSpots`·기준 좌표를 그대로 공유**한다. 홈
+진입에는 **카메라 권한을 요구하지 않는다**(카메라는 §7.2 도착-수집 단계에서만 켜짐).
 
 ```swift
-private enum SkyMode: String, CaseIterable { case realMap = "일반 지도", sky = "스카이 뷰" }
-@State private var skyMode: SkyMode = .realMap
+private enum SkyMode: String, CaseIterable { case sky = "스카이 뷰", realMap = "일반 지도" }
+@State private var skyMode: SkyMode = .sky          // 메인 홈 = 스카이 뷰
+@State private var showCuration = false
 
 Picker("뷰 전환", selection: $skyMode) {
     ForEach(SkyMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
@@ -1565,11 +1566,24 @@ Picker("뷰 전환", selection: $skyMode) {
 .pickerStyle(.segmented).frame(maxWidth: 260)
 
 switch skyMode {
-case .realMap: realMap                                   // MapKit + OpenAPI 마커(§2 지도 탭)
-case .sky:     ExploreSkyMapView(spots: vm.mapSpots,     // 동일 데이터, 우주 그리드 스킨
+case .sky:     ExploreSkyMapView(spots: vm.mapSpots,     // 우주 그리드 홈
                                  center: appLocation.coordinate,
                                  selectedSpot: $vm.selectedSpot,
-                                 onFaceTheSky: { showCapture = true })
+                                 onExplore: { showCuration = true })   // [내 주변 별 탐색]
+case .realMap: realMap                                   // MapKit + 동일 OpenAPI 마커
+}
+```
+
+**4단 마스터 플로우**: ① 우주 지도 홈 → ② 원버튼 큐레이션 → ③ 경로 매핑 → ④ 선택적 수집.
+하단 `[내 주변 별 탐색]` → 큐레이션 시트를 슬라이드 업하고, `[라이크]` 시 `selectedSpot`을 세팅하면
+홈에 점선 궤도 + 길안내 카드가 활성화된다.
+
+```swift
+.sheet(isPresented: $showCuration) {
+    SpotCurationSheet(spots: vm.mapSpots) { liked in     // [패스/새로고침/라이크]
+        withAnimation(.spring) { vm.selectedSpot = liked } // Like → 경로 궤도 + SpotCard 딥링크
+    }
+    .presentationDetents([.height(440), .large])
 }
 ```
 
@@ -1593,8 +1607,8 @@ Path { p in p.move(to: origin); p.addLine(to: point) }
 ```
 
 배경은 `LinearGradient`(딥블루) + `GridLines` Shape(그리드) + §4.4의 `StarfieldOverlay`(반짝이는 별)를
-`TimelineView(.animation)`로 합성한다. `[하늘 마주하기]`는 `fullScreenCover { CaptureFlowView() }`로
-촬영 루프에 진입한다. **실제 구현은 `ExploreSkyMapView.swift` 참고(빌드 통과).**
+`TimelineView(.animation)`로 합성한다. 촬영은 §7.2 도착 팝업 `[수집하기]`에서만 `CaptureFlowView`로
+진입한다(선택적 수집). **실제 구현은 `ExploreSkyMapView.swift` · `SpotCurationSheet.swift` 참고(빌드 통과).**
 
 ---
 
