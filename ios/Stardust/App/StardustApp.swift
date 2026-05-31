@@ -29,7 +29,13 @@ struct RootView: View {
 
     var body: some View {
         if session.isAuthenticated {
-            TrendingFeedView()           // §5.5 무대(피드)
+            TabView {
+                TrendingFeedView()           // §5.5 무대(피드)
+                    .tabItem { Label("무대", systemImage: "sparkles") }
+                CaptureFlowView()            // 입력 Zero 3단 촬영 루프
+                    .tabItem { Label("담기", systemImage: "camera.fill") }
+            }
+            .tint(.white)
         } else {
             LoginView()                  // Sign in with Apple → session.login(...)
         }

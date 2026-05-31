@@ -9,6 +9,12 @@ final class SkyUploadViewModel: ObservableObject {
     private let api = StardustAPI.shared
     private let safeZone = SafeZoneManager.shared   // §3
 
+    /// 업로드 흐름 밖에서 실패를 표시(예: 위치 권한 거부).
+    func markFailed(_ message: String) { phase = .failed(message) }
+
+    /// 새 촬영을 위해 상태 초기화.
+    func reset() { phase = .idle }
+
     /// 사용자에게 아무것도 묻지 않는다: 영상 + 현재 좌표만 받으면 끝.
     func publish(videoFileURL: URL,
                  rawCoordinate: CLLocationCoordinate2D,
