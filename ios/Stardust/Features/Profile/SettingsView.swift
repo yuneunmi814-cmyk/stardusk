@@ -77,6 +77,7 @@ struct SettingsView: View {
                     Section { Text(errorText).font(.footnote).foregroundStyle(.red) }
                 }
             }
+            .tint(Color(hex: "#5794E4"))   // 탭바의 흰색 tint 상속 차단(버튼/링크 보이게)
             .navigationTitle("설정")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -102,8 +103,19 @@ struct SettingsView: View {
         working = true
         Task {
             defer { working = false }
-            do { try await session.deleteAccount() }   // 성공 시 로그아웃 → 로그인 화면
-            catch { errorText = "탈퇴에 실패했어요. 잠시 후 다시 시도해 주세요." }
+            do {
+                try await session.deleteAccount()       // 성공 시 로그아웃 → 로그인 화면
+            } catch let e as StardustError {
+                if case .unauthorized = e {
+                    // 세션 만료 → 로그아웃해 로그인 화면으로(재로그인 후 재시도)
+                    errorText = "세션이 만료됐어요. 다시 로그인 후 시도해 주세요."
+                    session.logout()
+                } else {
+                    errorText = e.errorDescription ?? "탈퇴에 실패했어요."
+                }
+            } catch {
+                errorText = "탈퇴에 실패했어요. 잠시 후 다시 시도해 주세요."
+            }
         }
     }
 
