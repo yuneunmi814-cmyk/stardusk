@@ -112,10 +112,15 @@ struct ExploreMapView: View {
                 }
 
                 if vm.mapSpots.isEmpty && !vm.isLoading {
-                    Text("주변에 표시할 명소가 없어요")
-                        .font(.footnote).foregroundStyle(.secondary)
-                        .padding(10).background(.regularMaterial, in: Capsule())
-                        .padding(.bottom, 24)
+                    VStack(spacing: 6) {
+                        Image(systemName: "moon.stars.fill").font(.title2)
+                        Text("이 지역은 아직 준비 중이에요").font(.subheadline.weight(.semibold))
+                    }
+                    .foregroundStyle(.white.opacity(0.9))
+                    .padding(.vertical, 14).padding(.horizontal, 18)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    .allowsHitTesting(false)
                 }
             }
             .overlay(alignment: .top) {

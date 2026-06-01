@@ -75,15 +75,30 @@ struct ExploreSkyMapView: View {
 // MARK: - 우주 그리드 배경
 
 private struct CosmicGridBackground: View {
+    // 홈은 HTML sky-grid 처럼 차분하게 — 깜빡이지 않는 아주 옅은 고정 별만.
+    private static let dots: [(x: CGFloat, y: CGFloat, r: CGFloat, a: Double)] =
+        (0..<16).map { _ in
+            (CGFloat.random(in: 0...1), CGFloat.random(in: 0...1),
+             CGFloat.random(in: 0.6...1.1), Double.random(in: 0.18...0.42))
+        }
+
     var body: some View {
         ZStack {
             LinearGradient(colors: [Color(hex: "#0B1026"), Color(hex: "#111A33"), Color(hex: "#090D1C")],
                            startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
             GridLines().stroke(Color.white.opacity(0.055), lineWidth: 0.6).ignoresSafeArea()
-            TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: false)) { tl in
-                StarfieldOverlay(date: tl.date, bright: true).ignoresSafeArea()
+            Canvas { ctx, size in
+                for s in Self.dots {
+                    let d = s.r * 2
+                    let rect = CGRect(x: s.x * size.width - d / 2,
+                                      y: s.y * size.height - d / 2, width: d, height: d)
+                    ctx.opacity = s.a
+                    ctx.fill(Path(ellipseIn: rect), with: .color(.white))
+                }
             }
+            .allowsHitTesting(false)
+            .ignoresSafeArea()
         }
     }
 }
