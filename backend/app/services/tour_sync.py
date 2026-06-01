@@ -205,8 +205,12 @@ async def recompute_labels(theta_hot: float = THETA_HOT) -> int:
 # 4) 동기화 엔트리포인트
 # ---------------------------------------------------------------------------
 async def run_area_sync(area_code: str | None = None, num_of_rows: int = 100,
-                        max_pages: int | None = None) -> int:
-    """지역기반 관광정보(areaBasedList2)를 페이지네이션으로 전량 수집·UPSERT."""
+                        max_pages: int | None = None, relabel: bool = True) -> int:
+    """지역기반 관광정보(areaBasedList2)를 페이지네이션으로 전량 수집·UPSERT.
+
+    relabel=False 면 성향 라벨 재계산을 건너뛴다(여러 지역 연속 동기화 시,
+    마지막에 한 번만 재계산하기 위함).
+    """
     area_code = area_code or settings.KTO_DEFAULT_AREA_CODE
     total_saved = 0
     page = 1
@@ -243,8 +247,29 @@ async def run_area_sync(area_code: str | None = None, num_of_rows: int = 100,
 
     logger.info("✅ area=%s 동기화 완료: %s건 UPSERT", area_code, total_saved)
     # 동기화 직후 성향 라벨(popularity_score/label) 재계산 — 추천 시점 무연산화.
-    await recompute_labels()
+    if relabel:
+        await recompute_labels()
     return total_saved
+
+
+# 한국관광공사 17개 광역 지역코드 (전국).
+ALL_AREA_CODES = [
+    "1", "2", "3", "4", "5", "6", "7", "8",
+    "31", "32", "33", "34", "35", "36", "37", "38", "39",
+]
+
+
+async def run_all_areas(num_of_rows: int = 100, max_pages: int | None = None) -> int:
+    """전국 17개 지역을 순차 동기화하고, 마지막에 성향 라벨을 한 번만 재계산한다."""
+    grand_total = 0
+    for code in ALL_AREA_CODES:
+        try:
+            grand_total += await run_area_sync(code, num_of_rows, max_pages, relabel=False)
+        except Exception as e:  # 한 지역 실패가 전체를 막지 않도록(예: 일시 오류)
+            logger.warning("area=%s 동기화 실패: %s", code, e)
+    await recompute_labels()
+    logger.info("🌏 전국 동기화 완료: 총 %s건 UPSERT", grand_total)
+    return grand_total
 
 
 async def fetch_location_based(latitude: float, longitude: float, radius: int = 1000,
@@ -270,6 +295,7 @@ async def fetch_location_based(latitude: float, longitude: float, radius: int = 
 def _main() -> None:
     parser = argparse.ArgumentParser(description="STARDUST 관광 데이터 동기화")
     parser.add_argument("--area", default=None, help="areaCode (기본: 강원 32)")
+    parser.add_argument("--all", action="store_true", help="전국 17개 지역 전량 동기화")
     parser.add_argument("--rows", type=int, default=100, help="페이지당 건수")
     parser.add_argument("--pages", type=int, default=None, help="최대 페이지(테스트용)")
     args = parser.parse_args()
@@ -277,7 +303,10 @@ def _main() -> None:
     if not settings.KTO_SERVICE_KEY:
         raise SystemExit("KTO_SERVICE_KEY 가 비어 있습니다. backend/.env 를 확인하세요.")
 
-    asyncio.run(run_area_sync(args.area, args.rows, args.pages))
+    if args.all:
+        asyncio.run(run_all_areas(args.rows, args.pages))
+    else:
+        asyncio.run(run_area_sync(args.area, args.rows, args.pages))
 
 
 if __name__ == "__main__":
