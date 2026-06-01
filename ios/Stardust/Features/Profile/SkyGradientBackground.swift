@@ -37,11 +37,12 @@ struct StarfieldOverlay: View {
             let t = date.timeIntervalSinceReferenceDate
             let dim = bright ? 1.0 : 0.6
             for s in stars {
-                // 밝기만 아주 천천히(10~14초 주기) 0.30~0.80 사이로. 크기 변화 없음.
+                // 아주 천천히(10~14초 주기): 밝기 0.30~0.80, 크기는 0.9~1.10 으로 은은하게만.
                 let w = 2 * .pi / s.period
                 let f = 0.5 + 0.5 * sin(t * w + s.phase)   // 0~1, 매우 느림
                 let opacity = (0.30 + 0.50 * f) * dim
-                let d = s.r * 2                              // 고정 크기(펄스 제거)
+                let scale = 0.9 + 0.20 * f                  // 살짝만 호흡(과하지 않게)
+                let d = s.r * 2 * scale
                 let rect = CGRect(x: s.x * size.width - d / 2,
                                   y: s.y * size.height - d / 2, width: d, height: d)
                 ctx.opacity = opacity
