@@ -3,4 +3,7 @@
 // Render 배포 호스트(`//` 는 `$()` 로 끊어 표기).
 //    빌드 시 결과: https://stardust-api-ts8t.onrender.com/api/v1
 
+// 로컬 시크릿(네이버 자격증명 등) — 없어도 빌드되도록 optional include.
+#include? "Secrets.xcconfig"
+
 STARDUST_API_BASE_URL = https:/$()/stardust-api-ts8t.onrender.com/api/v1

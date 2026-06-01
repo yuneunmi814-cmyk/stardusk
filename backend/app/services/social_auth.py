@@ -133,10 +133,81 @@ async def verify_google(identity_token: str) -> dict:
             "name": claims.get("name")}
 
 
+# Kakao/Naver 는 JWT(identity_token)가 아니라 OAuth access_token 을 사용한다.
+# 클라이언트가 받은 access_token 으로 각 제공자의 사용자정보 API 를 호출해
+# '토큰 유효성 + 안정적인 사용자 id' 를 서버에서 직접 확인한다(위변조 불가).
+KAKAO_USERINFO_URL = "https://kapi.kakao.com/v2/user/me"
+NAVER_USERINFO_URL = "https://openapi.naver.com/v1/nid/me"
+
+
+async def _get_userinfo(url: str, access_token: str, provider: str) -> dict:
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(
+                url, headers={"Authorization": f"Bearer {access_token}"}
+            )
+    except httpx.HTTPError as e:
+        raise _auth_error("AUTH_PROVIDER_UNAVAILABLE",
+                          "소셜 인증 서버에 연결하지 못했습니다.") from e
+    if resp.status_code == 401:
+        raise _auth_error("INVALID_TOKEN", f"{provider} 인증 토큰이 유효하지 않습니다.")
+    if resp.status_code >= 400:
+        raise _auth_error("INVALID_TOKEN", f"{provider} 사용자 정보 조회에 실패했습니다.")
+    try:
+        return resp.json()
+    except ValueError as e:
+        raise _auth_error("INVALID_TOKEN", f"{provider} 응답을 해석하지 못했습니다.") from e
+
+
+async def verify_kakao(access_token: str) -> dict:
+    """카카오 access_token 검증 → {"subject", "email", "name"}.
+
+    kapi.kakao.com/v2/user/me 가 200 을 주면 토큰이 유효한 것이며, 안정적 식별자
+    인 카카오 회원번호(id)를 subject 로 사용한다.
+    """
+    if not access_token:
+        raise _auth_error("INVALID_TOKEN", "유효하지 않은 인증 토큰입니다.")
+    data = await _get_userinfo(KAKAO_USERINFO_URL, access_token, "kakao")
+    uid = data.get("id")
+    if uid is None:
+        raise _auth_error("INVALID_TOKEN", "카카오 사용자 식별자를 확인할 수 없습니다.")
+    account = data.get("kakao_account") or {}
+    profile = account.get("profile") or {}
+    return {"subject": str(uid), "email": account.get("email"),
+            "name": profile.get("nickname")}
+
+
+async def verify_naver(access_token: str) -> dict:
+    """네이버 access_token 검증 → {"subject", "email", "name"}.
+
+    openapi.naver.com/v1/nid/me 의 resultcode 가 '00' 이면 유효하며, response.id
+    (네이버 회원 고유 식별자)를 subject 로 사용한다.
+    """
+    if not access_token:
+        raise _auth_error("INVALID_TOKEN", "유효하지 않은 인증 토큰입니다.")
+    data = await _get_userinfo(NAVER_USERINFO_URL, access_token, "naver")
+    if data.get("resultcode") != "00":
+        raise _auth_error("INVALID_TOKEN", "네이버 인증 토큰이 유효하지 않습니다.")
+    profile = data.get("response") or {}
+    uid = profile.get("id")
+    if not uid:
+        raise _auth_error("INVALID_TOKEN", "네이버 사용자 식별자를 확인할 수 없습니다.")
+    return {"subject": str(uid), "email": profile.get("email"),
+            "name": profile.get("name") or profile.get("nickname")}
+
+
 async def verify_social_token(provider: str, identity_token: str) -> dict:
-    """provider 별 검증기로 분기. 표준화된 클레임 dict 를 반환한다."""
+    """provider 별 검증기로 분기. 표준화된 클레임 dict 를 반환한다.
+
+    apple/google 은 identity_token(JWT)을, kakao/naver 는 OAuth access_token 을
+    동일한 필드(identity_token)에 담아 전달한다.
+    """
     if provider == "apple":
         return await verify_apple(identity_token)
     if provider == "google":
         return await verify_google(identity_token)
+    if provider == "kakao":
+        return await verify_kakao(identity_token)
+    if provider == "naver":
+        return await verify_naver(identity_token)
     raise _auth_error("UNSUPPORTED_PROVIDER", f"지원하지 않는 로그인 방식입니다: {provider}")
