@@ -37,26 +37,36 @@ struct StardustApp: App {
     }
 }
 
-/// 인증 → 위치 설정 → 메인(탐색/무대/담기) 순으로 가르는 루트.
+/// 로그인 → 메인 탭(담기·탐색·피드). 위치는 탐색탭에서 자동 취득하고,
+/// '변경'을 누를 때만 위치 설정 지도를 전체화면으로 띄운다.
 struct RootView: View {
     @EnvironmentObject private var session: SessionStore
     @EnvironmentObject private var appLocation: AppLocation
+    @State private var tab = 1   // 가운데(탐색) 기본 선택
 
     var body: some View {
         if !session.isAuthenticated {
-            LoginView()                       // Sign in with Apple → session.login(...)
-        } else if !appLocation.isConfirmed {
-            LocationSetupView()               // 현재 위치 자동 + 직접 수정 → "해당 위치로 시작하기"
+            LoginView()                       // 소셜 로그인 / 게스트 둘러보기
         } else {
-            TabView {
-                ExploreView()                 // 하이브리드 탐색(지도/리스트 듀얼 탭)
-                    .tabItem { Label("탐색", systemImage: "map.fill") }
-                TrendingFeedView()            // 무대(피드)
-                    .tabItem { Label("무대", systemImage: "sparkles") }
-                CaptureFlowView()             // 입력 Zero 3단 촬영 루프
+            TabView(selection: $tab) {
+                CaptureFlowView()             // 입력 Zero 촬영 루프
                     .tabItem { Label("담기", systemImage: "camera.fill") }
+                    .tag(0)
+                ExploreView()                 // 메인 홈 — 하이브리드 탐색
+                    .tabItem { Label("탐색", systemImage: "map.fill") }
+                    .tag(1)
+                TrendingFeedView()            // 피드(다른 여행자들의 하늘)
+                    .tabItem { Label("피드", systemImage: "sparkles") }
+                    .tag(2)
             }
             .tint(.white)
+            // 사용자가 '변경'을 눌렀을 때만 위치 설정 지도를 띄운다.
+            .fullScreenCover(isPresented: Binding(
+                get: { appLocation.isPickingManually },
+                set: { if !$0 { appLocation.confirm() } }
+            )) {
+                LocationSetupView()
+            }
         }
     }
 }

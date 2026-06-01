@@ -165,7 +165,7 @@ private struct ExploreNearbyButton: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 Image(systemName: "sparkles").font(.headline)
-                Text("내 주변 별 탐색").font(.callout.weight(.semibold))
+                Text("내 주변 관광지 찾기").font(.callout.weight(.semibold))
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 22).frame(height: 52)
