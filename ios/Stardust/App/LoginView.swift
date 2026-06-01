@@ -75,9 +75,18 @@ struct LoginView: View {
                         handleNaver()
                     }
 
-                    // ③ 게스트 — HTML btn-ghost
+                    // ③ 게스트 — HTML btn-ghost (서버 익명 토큰으로 입장)
                     Button {
-                        errorText = "게스트 둘러보기는 곧 제공돼요. 로그인 후 별을 띄워보세요."
+                        isWorking = true
+                        Task {
+                            defer { isWorking = false }
+                            do {
+                                try await session.guestLogin()
+                                errorText = nil
+                            } catch {
+                                errorText = "둘러보기 진입에 실패했어요. 잠시 후 다시 시도해 주세요."
+                            }
+                        }
                     } label: {
                         Text("둘러보기 (게스트)")
                             .font(.system(size: 14, weight: .semibold))

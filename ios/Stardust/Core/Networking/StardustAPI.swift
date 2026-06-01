@@ -71,6 +71,14 @@ actor StardustAPI {
         return env.data
     }
 
+    /// 게스트(비로그인) 둘러보기 — 서버에서 익명 토큰을 받는다.
+    func guestLogin() async throws -> AuthData {
+        var req = URLRequest(url: baseURL.appendingPathComponent("auth/guest"))
+        req.httpMethod = "POST"
+        let env = try await run(req, as: APIEnvelope<AuthData>.self)
+        return env.data
+    }
+
     // MARK: 트렌딩 피드 — 동접 + 강원 가중치 순
     func fetchTrending(limit: Int = 20, offset: Int = 0) async throws -> [TrendingItem] {
         var comp = URLComponents(
