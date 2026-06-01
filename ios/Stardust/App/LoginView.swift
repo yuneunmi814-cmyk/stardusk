@@ -41,45 +41,57 @@ struct LoginView: View {
                         .font(.largeTitle.bold())
                         .foregroundStyle(.white)
                         .tracking(4)
-                    Text("당신이 머문 자리마다 별이 뜹니다")
+                    Text("당신이 머문 자리마다\n별이 뜹니다")
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.85))
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(3)
                 }
 
                 Spacer()
 
-                VStack(spacing: 12) {
-                    // ① Apple 로그인 (1순위)
-                    SignInWithAppleButton(.signIn) { request in
+                VStack(spacing: 9) {
+                    // ① Apple — 공식 버튼(HTML btn-apple: 검정)
+                    SignInWithAppleButton(.continue) { request in
                         request.requestedScopes = [.fullName, .email]
                     } onCompletion: { result in
                         handleApple(result)
                     }
-                    .signInWithAppleButtonStyle(.white)
-                    .frame(height: 52)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .signInWithAppleButtonStyle(.black)
+                    .frame(height: 50)
+                    .clipShape(RoundedRectangle(cornerRadius: 15))
 
-                    // ② 소셜 로그인 — Google 은 실제 연동, 카카오/네이버는 자리표시자
-                    socialButton(title: "Google 로 계속하기", system: "g.circle.fill") {
+                    // ② 브랜드 색 소셜 버튼 (HTML btn-google/kakao/naver)
+                    brandButton("Google로 계속하기", icon: "g.circle.fill",
+                                bg: .white, fg: Color(hex: "#1F1F1F"), bordered: true) {
                         handleGoogle()
                     }
-                    socialButton(title: "카카오로 계속하기", system: "message.fill") {
+                    brandButton("카카오로 계속하기", icon: "message.fill",
+                                bg: Color(hex: "#FEE500"), fg: Color(hex: "#191600")) {
                         handleKakao()
                     }
-                    socialButton(title: "네이버로 계속하기", system: "n.square.fill") {
+                    brandButton("네이버로 계속하기", icon: "n.square.fill",
+                                bg: Color(hex: "#03C75A"), fg: .white) {
                         handleNaver()
                     }
 
-                    // ③ 게스트 — 둘러보기
+                    // ③ 게스트 — HTML btn-ghost
                     Button {
-                        // 게스트는 토큰 없이 피드만 둘러보기(현재는 비활성 안내)
                         errorText = "게스트 둘러보기는 곧 제공돼요. 로그인 후 별을 띄워보세요."
                     } label: {
-                        Text("로그인 없이 둘러보기")
-                            .font(.footnote.weight(.medium))
-                            .foregroundStyle(.white.opacity(0.8))
-                            .padding(.top, 4)
+                        Text("둘러보기 (게스트)")
+                            .font(.system(size: 14, weight: .semibold))
+                            .frame(maxWidth: .infinity).frame(height: 48)
+                            .foregroundStyle(.white)
+                            .background(.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 15))
+                            .overlay(RoundedRectangle(cornerRadius: 15)
+                                .stroke(.white.opacity(0.25), lineWidth: 1))
                     }
+
+                    Text("토큰은 Keychain에 안전하게 보관됩니다")
+                        .font(.system(size: 9.5))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .padding(.top, 6)
                 }
                 .padding(.horizontal, 28)
                 .disabled(isWorking)
@@ -99,25 +111,24 @@ struct LoginView: View {
         .onAppear { breathe = true }
     }
 
+    /// HTML btn-google/kakao/naver — 브랜드 색 소셜 버튼.
     @ViewBuilder
-    private func socialButton(title: String, system: String,
-                              action: (() -> Void)? = nil) -> some View {
-        Button {
-            if let action {
-                action()
-            } else {
-                errorText = "\(title.replacingOccurrences(of: "로 계속하기", with: "")) 연동은 준비 중이에요."
+    private func brandButton(_ title: String, icon: String,
+                             bg: Color, fg: Color, bordered: Bool = false,
+                             action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 9) {
+                Image(systemName: icon)
+                Text(title).font(.system(size: 14, weight: .semibold))
             }
-        } label: {
-            HStack {
-                Image(systemName: system)
-                Text(title).font(.callout.weight(.semibold))
+            .frame(maxWidth: .infinity).frame(height: 50)
+            .foregroundStyle(fg)
+            .background(bg, in: RoundedRectangle(cornerRadius: 15))
+            .overlay {
+                if bordered {
+                    RoundedRectangle(cornerRadius: 15).stroke(.black.opacity(0.12), lineWidth: 1)
+                }
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 52)
-            .foregroundStyle(.white)
-            .background(.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(.white.opacity(0.25), lineWidth: 1))
         }
     }
 
