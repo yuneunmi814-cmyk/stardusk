@@ -38,6 +38,27 @@ final class TrendingFeedViewModel: ObservableObject {
             errorText = "피드를 불러오지 못했어요."
         }
     }
+
+    // MARK: UGC 모더레이션 — 신고/차단 후 피드에서 즉시 제거
+    func report(_ item: TrendingItem, reason: String) async {
+        do {
+            try await api.reportVideo(skyVideoId: item.skyVideoId, reason: reason)
+            items.removeAll { $0.id == item.id }
+            errorText = nil
+        } catch {
+            errorText = "신고에 실패했어요. 잠시 후 다시 시도해 주세요."
+        }
+    }
+
+    func block(_ item: TrendingItem) async {
+        do {
+            try await api.blockUser(userId: item.userId)
+            items.removeAll { $0.userId == item.userId }   // 그 사용자 콘텐츠 모두 제거
+            errorText = nil
+        } catch {
+            errorText = "차단에 실패했어요. 잠시 후 다시 시도해 주세요."
+        }
+    }
 }
 
 struct TrendingFeedView: View {
@@ -51,6 +72,7 @@ struct TrendingFeedView: View {
                     AutoplayVideoCell(video: item)
                         .environmentObject(stage)
                         .overlay(alignment: .topLeading) { metaBadge(item) }
+                        .overlay(alignment: .topTrailing) { moderationMenu(item) }
                         .padding(.horizontal, 16)
                         .task { await vm.loadMoreIfNeeded(current: item) }
                 }
@@ -84,6 +106,39 @@ struct TrendingFeedView: View {
             }
         }
         .padding(26)
+    }
+
+    // 신고/차단 메뉴 (App Store Guideline 1.2 — UGC 모더레이션)
+    @ViewBuilder
+    private func moderationMenu(_ item: TrendingItem) -> some View {
+        Menu {
+            Menu("신고하기", systemImage: "flag") {
+                Button("스팸 또는 광고", role: .destructive) {
+                    Task { await vm.report(item, reason: "spam") }
+                }
+                Button("부적절한 콘텐츠", role: .destructive) {
+                    Task { await vm.report(item, reason: "inappropriate") }
+                }
+                Button("불쾌감을 주는 표현", role: .destructive) {
+                    Task { await vm.report(item, reason: "offensive") }
+                }
+                Button("폭력적·위험한 콘텐츠", role: .destructive) {
+                    Task { await vm.report(item, reason: "violence") }
+                }
+                Button("기타", role: .destructive) {
+                    Task { await vm.report(item, reason: "other") }
+                }
+            }
+            Button("이 사용자 차단", systemImage: "person.slash", role: .destructive) {
+                Task { await vm.block(item) }
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.headline).foregroundStyle(.white)
+                .frame(width: 38, height: 38)
+                .background(.ultraThinMaterial, in: Circle())
+        }
+        .padding(22)
     }
 
     @ViewBuilder

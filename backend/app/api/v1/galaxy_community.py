@@ -27,13 +27,16 @@ from app.core.security import get_current_user
 from app.core.validation import ensure_korea_coords, ensure_video_magic
 from app.db.session import get_session
 from app.schemas.community import (
+    BlockRequest,
     HeartbeatData,
     HeartbeatResponse,
     ParticipantProfile,
+    ReportRequest,
     RoomJoinData,
     RoomJoinResponse,
     RoomLeaveData,
     RoomLeaveResponse,
+    SimpleResponse,
     SkyVideoCreateResponse,
     SkyVideoData,
     TrendingData,
@@ -61,6 +64,9 @@ router = APIRouter(prefix="/community", tags=["community"])
 #   최종 점수 = live_users_count + (강원이면 _GANGWON_BOOST)
 #   → 강원 영상이 강하게 상단으로 올라오되, 압도적으로 핫한 타 지역 방도 묻히지 않게 한다.
 _GANGWON_BOOST = 50
+
+# 서로 다른 사용자 N명 이상이 신고하면 검수 전까지 피드에서 자동 숨김(Guideline 1.2).
+_REPORT_HIDE_THRESHOLD = 3
 
 
 # --- SQL ---------------------------------------------------------------------
@@ -167,12 +173,46 @@ _TRENDING = text(
     FROM sky_videos sv
     LEFT JOIN tour_spots ts ON sv.tour_id = ts.content_id
     LEFT JOIN alive a       ON a.sky_video_id = sv.id
+    WHERE
+        -- 내가 차단한 사용자의 콘텐츠 제외
+        sv.user_id NOT IN (
+            SELECT blocked_user_id FROM user_blocks WHERE blocker_user_id = :uid
+        )
+        -- 내가 이미 신고한 콘텐츠 즉시 제외(신고 직후 사라짐)
+        AND sv.id NOT IN (
+            SELECT sky_video_id FROM content_reports WHERE reporter_user_id = :uid
+        )
+        -- 여러 명이 신고해 임계 초과한 콘텐츠 자동 숨김
+        AND sv.id NOT IN (
+            SELECT sky_video_id FROM content_reports
+            GROUP BY sky_video_id HAVING count(*) >= :report_threshold
+        )
     ORDER BY
         (COALESCE(a.live_count, 0)
             + CASE WHEN ts.area_code = :area_code THEN :boost ELSE 0 END) DESC,
         sv.created_at DESC
     LIMIT :limit OFFSET :offset;
     """
+)
+
+# 신고: (신고자, 영상) 1회만(중복 무시).
+_INSERT_REPORT = text(
+    """
+    INSERT INTO content_reports (reporter_user_id, sky_video_id, reason, detail)
+    VALUES (:uid, :vid, :reason, :detail)
+    ON CONFLICT (reporter_user_id, sky_video_id) DO NOTHING;
+    """
+)
+# 차단/해제.
+_INSERT_BLOCK = text(
+    """
+    INSERT INTO user_blocks (blocker_user_id, blocked_user_id)
+    VALUES (:uid, :blocked)
+    ON CONFLICT (blocker_user_id, blocked_user_id) DO NOTHING;
+    """
+)
+_DELETE_BLOCK = text(
+    "DELETE FROM user_blocks WHERE blocker_user_id = :uid AND blocked_user_id = :blocked;"
 )
 
 
@@ -430,6 +470,8 @@ async def trending_feed(
         "alive": ALIVE_WINDOW_SEC,
         "area_code": "32",          # 강원도
         "boost": _GANGWON_BOOST,
+        "uid": user["user_id"],
+        "report_threshold": _REPORT_HIDE_THRESHOLD,
         "limit": limit,
         "offset": offset,
     })).mappings().all()
@@ -454,3 +496,56 @@ async def trending_feed(
         for r in rows
     ]
     return TrendingResponse(data=TrendingData(total=len(items), items=items))
+
+
+# --- UGC 모더레이션(신고/차단) — App Store Guideline 1.2 -----------------------
+@router.post("/report", response_model=SimpleResponse, summary="하늘 영상 신고")
+async def report_video(
+    payload: ReportRequest,
+    user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> SimpleResponse:
+    """부적절한 콘텐츠를 신고한다. 신고 즉시 신고자에게는 해당 영상이 숨겨지며,
+    서로 다른 사용자 N명 이상이 신고하면 검수 전까지 피드에서 자동 숨김 처리된다."""
+    await _assert_video_exists(session, payload.sky_video_id)
+    await session.execute(_INSERT_REPORT, {
+        "uid": user["user_id"],
+        "vid": payload.sky_video_id,
+        "reason": payload.reason,
+        "detail": payload.detail,
+    })
+    await session.commit()
+    return SimpleResponse(message="신고가 접수되었습니다. 24시간 내 검토됩니다.")
+
+
+@router.post("/block", response_model=SimpleResponse, summary="사용자 차단")
+async def block_user(
+    payload: BlockRequest,
+    user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> SimpleResponse:
+    """해당 사용자의 콘텐츠를 더 이상 보지 않는다(피드에서 즉시 제외)."""
+    if str(payload.blocked_user_id) == str(user["user_id"]):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"status": "error", "code": "CANNOT_BLOCK_SELF",
+                    "message": "자기 자신은 차단할 수 없습니다."},
+        )
+    await session.execute(_INSERT_BLOCK, {
+        "uid": user["user_id"], "blocked": payload.blocked_user_id,
+    })
+    await session.commit()
+    return SimpleResponse(message="차단되었습니다.")
+
+
+@router.delete("/block/{blocked_user_id}", response_model=SimpleResponse, summary="차단 해제")
+async def unblock_user(
+    blocked_user_id: uuid.UUID,
+    user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> SimpleResponse:
+    await session.execute(_DELETE_BLOCK, {
+        "uid": user["user_id"], "blocked": blocked_user_id,
+    })
+    await session.commit()
+    return SimpleResponse(message="차단이 해제되었습니다.")
