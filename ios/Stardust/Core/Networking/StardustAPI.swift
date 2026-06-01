@@ -71,6 +71,13 @@ actor StardustAPI {
         return env.data
     }
 
+    /// 회원 탈퇴 — 서버에서 계정·데이터를 파기한다.
+    func deleteAccount() async throws {
+        var req = URLRequest(url: baseURL.appendingPathComponent("auth/me"))
+        req.httpMethod = "DELETE"
+        _ = try await run(req, as: SimpleOK.self)
+    }
+
     /// 게스트(비로그인) 둘러보기 — 서버에서 익명 토큰을 받는다.
     func guestLogin() async throws -> AuthData {
         var req = URLRequest(url: baseURL.appendingPathComponent("auth/guest"))

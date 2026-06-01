@@ -11,6 +11,7 @@ struct ExploreView: View {
     private enum Mode: String, CaseIterable { case map = "지도로 탐색", list = "리스트로 탐색" }
     @State private var mode: Mode = .map
     @State private var showCuration = false
+    @State private var showSettings = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -58,8 +59,12 @@ struct ExploreView: View {
                 Text("변경").font(.caption.weight(.semibold))
             }
             Spacer()
+            Button { showSettings = true } label: {
+                Image(systemName: "gearshape.fill").font(.body).foregroundStyle(.secondary)
+            }
         }
         .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 6)
+        .sheet(isPresented: $showSettings) { SettingsView() }
     }
 }
 
