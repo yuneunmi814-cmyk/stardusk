@@ -1,51 +1,36 @@
 import SwiftUI
 
-/// HTML 프로토타입과 동일한 밤하늘 배경 — 정적 그러데이션 + 잔잔히 깜빡이는 별.
-/// (이전의 '떠다니는 빛무리'는 산만해서 제거했다.)
+/// 정적인 밤하늘 배경 — 그러데이션 + 깜빡이지 않는 아주 옅은 고정 별.
+/// (반짝임이 산만하다는 피드백 반영 → 트윈클 애니메이션을 완전히 제거)
 struct SkyGradientBackground: View {
     let mood: SkyMood
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 20.0, paused: false)) { timeline in
-            ZStack {
-                mood.gradient.ignoresSafeArea()
-                StarfieldOverlay(date: timeline.date, bright: mood.prefersBrightStars)
-                    .ignoresSafeArea()
-            }
+        ZStack {
+            mood.gradient.ignoresSafeArea()
+            StarfieldOverlay(bright: mood.prefersBrightStars).ignoresSafeArea()
         }
     }
 }
 
-/// HTML `.starfield` 재현 — 별 34개를 화면 상단 70% 영역에 흩뿌리고,
-/// 각자 3초 주기(랜덤 위상)로 은은하게 깜빡인다.
-///   opacity .15 ↔ .95 / scale .7 ↔ 1.25  (HTML @keyframes tw 와 동일)
+/// 깜빡이지 않는 고정 별 28개. 각자 고정된 옅은 밝기로 가만히 떠 있다.
 struct StarfieldOverlay: View {
-    let date: Date
     var bright: Bool = true
 
-    private struct Star { let x, y, r: CGFloat; let phase: Double; let period: Double }
-    // 24개, 상단 70%. 별마다 10~14초의 '아주 느린' 주기로 따로따로 깜빡인다.
-    private let stars: [Star] = (0..<24).map { _ in
-        Star(x: .random(in: 0...1), y: .random(in: 0...0.7),
-             r: .random(in: 0.8...1.2),
-             phase: .random(in: 0...(2 * .pi)),
-             period: .random(in: 10...14))
+    private struct Star { let x, y, r: CGFloat; let a: Double }
+    private let stars: [Star] = (0..<28).map { _ in
+        Star(x: .random(in: 0...1), y: .random(in: 0...0.92),
+             r: .random(in: 0.6...1.2), a: .random(in: 0.22...0.55))
     }
 
     var body: some View {
         Canvas { ctx, size in
-            let t = date.timeIntervalSinceReferenceDate
             let dim = bright ? 1.0 : 0.6
             for s in stars {
-                // 아주 천천히(10~14초 주기): 밝기 0.30~0.80, 크기는 0.9~1.10 으로 은은하게만.
-                let w = 2 * .pi / s.period
-                let f = 0.5 + 0.5 * sin(t * w + s.phase)   // 0~1, 매우 느림
-                let opacity = (0.30 + 0.50 * f) * dim
-                let scale = 0.9 + 0.20 * f                  // 살짝만 호흡(과하지 않게)
-                let d = s.r * 2 * scale
+                let d = s.r * 2
                 let rect = CGRect(x: s.x * size.width - d / 2,
                                   y: s.y * size.height - d / 2, width: d, height: d)
-                ctx.opacity = opacity
+                ctx.opacity = s.a * dim
                 ctx.fill(Path(ellipseIn: rect), with: .color(.white))
             }
         }
