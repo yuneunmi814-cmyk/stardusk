@@ -38,7 +38,7 @@ enum SkyMood {
     /// 위(하늘 높이)에서 아래(지평선)로 흐르는 색 정지점.
     var stops: [Color] {
         switch self {
-        case .dawn:     return [Color(hex:"#3A2E6E"), Color(hex:"#7A6FB0"), Color(hex:"#E9B7C8")]
+        case .dawn:     return [Color(hex:"#3A2A63"), Color(hex:"#5B6FB5"), Color(hex:"#C89BD6"), Color(hex:"#F7C9B0")]
         case .rosyDawn: return [Color(hex:"#F7A8B8"), Color(hex:"#FBC7D4"), Color(hex:"#FCD9A8")]
         case .clearDay: return [Color(hex:"#5794E4"), Color(hex:"#8FBEF0"), Color(hex:"#CFE5FB")]
         case .sunshine: return [Color(hex:"#7EC8F2"), Color(hex:"#BFE3F5"), Color(hex:"#FCEFB0")]

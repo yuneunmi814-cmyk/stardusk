@@ -10,16 +10,33 @@ struct LoginView: View {
     @EnvironmentObject private var session: SessionStore
     @State private var errorText: String?
     @State private var isWorking = false
+    @State private var breathe = false   // orb 호흡 애니메이션
 
     var body: some View {
         ZStack {
-            SkyGradientBackground(mood: .night)   // §4.4a — 숨 쉬는 밤하늘 + 별
+            SkyGradientBackground(mood: .dawn)   // HTML 로그인과 동일한 새벽 하늘
                 .ignoresSafeArea()
 
             VStack(spacing: 28) {
                 Spacer()
 
-                VStack(spacing: 10) {
+                VStack(spacing: 14) {
+                    // HTML .orb — 천천히 호흡하는 빛무리(해)
+                    Circle()
+                        .fill(RadialGradient(
+                            colors: [.white,
+                                     Color(hex: "#CDB4F0"),
+                                     Color(hex: "#A6C8F0"),
+                                     Color(hex: "#F6C5D8"),
+                                     Color(hex: "#FBD9BF")],
+                            center: UnitPoint(x: 0.36, y: 0.30),
+                            startRadius: 2, endRadius: 60))
+                        .frame(width: 96, height: 96)
+                        .shadow(color: Color(hex: "#F6C5D8").opacity(0.55), radius: 26)
+                        .scaleEffect(breathe ? 1.06 : 1.0)
+                        .animation(.easeInOut(duration: 3.2).repeatForever(autoreverses: true),
+                                   value: breathe)
+
                     Text("STARDUST")
                         .font(.largeTitle.bold())
                         .foregroundStyle(.white)
@@ -79,6 +96,7 @@ struct LoginView: View {
             }
             .overlay { if isWorking { ProgressView().tint(.white) } }
         }
+        .onAppear { breathe = true }
     }
 
     @ViewBuilder
