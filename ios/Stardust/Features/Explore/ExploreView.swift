@@ -61,10 +61,11 @@ struct ExploreView: View {
             Spacer()
             Button { showSettings = true } label: {
                 Image(systemName: "line.3.horizontal")
-                    .font(.title3.weight(.semibold))
+                    .font(.body.weight(.bold))
                     .foregroundStyle(.primary)
-                    .frame(width: 40, height: 40)
-                    .contentShape(Rectangle())
+                    .frame(width: 38, height: 38)
+                    .background(Color(.systemGray5), in: Circle())
+                    .contentShape(Circle())
             }
             .accessibilityLabel("메뉴")
         }
