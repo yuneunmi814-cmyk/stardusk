@@ -23,24 +23,25 @@ struct StarfieldOverlay: View {
     let date: Date
     var bright: Bool = true
 
-    private struct Star { let x, y: CGFloat; let delay: Double }
-    // HTML seedStars() 그대로: 34개, left 0~100%, top 0~70%, animationDelay 0~3s
-    private let stars: [Star] = (0..<34).map { _ in
-        Star(x: .random(in: 0...1), y: .random(in: 0...0.7), delay: .random(in: 0...3))
+    private struct Star { let x, y, r: CGFloat; let phase: Double; let period: Double }
+    // 24개, 상단 70%. 별마다 10~14초의 '아주 느린' 주기로 따로따로 깜빡인다.
+    private let stars: [Star] = (0..<24).map { _ in
+        Star(x: .random(in: 0...1), y: .random(in: 0...0.7),
+             r: .random(in: 0.8...1.2),
+             phase: .random(in: 0...(2 * .pi)),
+             period: .random(in: 10...14))
     }
 
     var body: some View {
         Canvas { ctx, size in
             let t = date.timeIntervalSinceReferenceDate
-            let dim = bright ? 1.0 : 0.55
+            let dim = bright ? 1.0 : 0.6
             for s in stars {
-                // HTML @keyframes tw 동일: 3초 주기 ease-in-out,
-                // opacity .15↔.95 / scale .7↔1.25
-                let p = ((t + s.delay).truncatingRemainder(dividingBy: 3)) / 3
-                let f = 0.5 - 0.5 * cos(2 * .pi * p)        // ease-in-out 0→1→0
-                let opacity = (0.15 + 0.80 * f) * dim
-                let scale = 0.7 + 0.55 * f
-                let d = 2.0 * scale                          // HTML 별 크기 2px
+                // 밝기만 아주 천천히(10~14초 주기) 0.30~0.80 사이로. 크기 변화 없음.
+                let w = 2 * .pi / s.period
+                let f = 0.5 + 0.5 * sin(t * w + s.phase)   // 0~1, 매우 느림
+                let opacity = (0.30 + 0.50 * f) * dim
+                let d = s.r * 2                              // 고정 크기(펄스 제거)
                 let rect = CGRect(x: s.x * size.width - d / 2,
                                   y: s.y * size.height - d / 2, width: d, height: d)
                 ctx.opacity = opacity
