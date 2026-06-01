@@ -1,10 +1,10 @@
 // 경로: ios/Config/Debug.xcconfig
-// 디버그(시뮬레이터/개발) 빌드 — 로컬 백엔드를 가리킨다.
-// ⚠️ xcconfig 에서 `//` 는 주석이므로, URL 의 `//` 는 `$()` 로 끊어 표기한다.
-//    (빌드 시 빈 문자열로 치환되어 결과는 http://localhost:8000/api/v1)
-// localhost 평문 HTTP 는 Info.plist 의 NSAllowsLocalNetworking 으로만 허용된다.
+// 디버그 빌드도 운영 서버(Render)를 가리킨다 — 로컬 백엔드를 띄우지 않고
+// 배포 서버로 바로 테스트하기 위함. (`//` 는 `$()` 로 끊어 표기)
+//    빌드 시 결과: https://stardust-api-ts8t.onrender.com/api/v1
+// ※ 로컬 백엔드로 개발하려면 이 값을 http:/$()/localhost:8000/api/v1 로 되돌리면 된다.
 
 // 로컬 시크릿(네이버 자격증명 등) — 없어도 빌드되도록 optional include.
 #include? "Secrets.xcconfig"
 
-STARDUST_API_BASE_URL = http:/$()/localhost:8000/api/v1
+STARDUST_API_BASE_URL = https:/$()/stardust-api-ts8t.onrender.com/api/v1
