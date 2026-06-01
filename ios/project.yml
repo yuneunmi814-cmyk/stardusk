@@ -16,12 +16,20 @@ settings:
     GENERATE_INFOPLIST_FILE: NO
     ENABLE_USER_SCRIPT_SANDBOXING: YES
 
+packages:
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS
+    from: "7.1.0"
+
 targets:
   Stardust:
     type: application
     platform: iOS
     sources:
       - path: Stardust
+    dependencies:
+      - package: GoogleSignIn
+        product: GoogleSignIn
     # Debug/Release 별 API 호스트는 Config/*.xcconfig 로 주입한다(소스 밖에 둬서
     # 리소스로 포함되지 않게 한다). 값은 Info.plist 의 STARDUST_API_BASE_URL 로 흘러간다.
     configFiles:

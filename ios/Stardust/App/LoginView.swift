@@ -1,5 +1,6 @@
 import SwiftUI
 import AuthenticationServices
+import GoogleSignIn
 
 /// 첫 진입 화면 — "당신이 머문 자리마다 별이 뜹니다".
 /// Apple 로그인을 1순위로, 소셜/게스트는 보조 진입로로 둔다.
@@ -39,8 +40,10 @@ struct LoginView: View {
                     .frame(height: 52)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
 
-                    // ② 소셜 로그인 (서버 OAuth 연동 예정 — 자리표시자)
-                    socialButton(title: "Google 로 계속하기", system: "g.circle.fill")
+                    // ② 소셜 로그인 — Google 은 실제 연동, 카카오/네이버는 자리표시자
+                    socialButton(title: "Google 로 계속하기", system: "g.circle.fill") {
+                        handleGoogle()
+                    }
                     socialButton(title: "카카오로 계속하기", system: "message.fill")
                     socialButton(title: "네이버로 계속하기", system: "n.square.fill")
 
@@ -73,9 +76,14 @@ struct LoginView: View {
     }
 
     @ViewBuilder
-    private func socialButton(title: String, system: String) -> some View {
+    private func socialButton(title: String, system: String,
+                              action: (() -> Void)? = nil) -> some View {
         Button {
-            errorText = "\(title.replacingOccurrences(of: "로 계속하기", with: "")) 연동은 준비 중이에요."
+            if let action {
+                action()
+            } else {
+                errorText = "\(title.replacingOccurrences(of: "로 계속하기", with: "")) 연동은 준비 중이에요."
+            }
         } label: {
             HStack {
                 Image(systemName: system)
@@ -120,5 +128,52 @@ struct LoginView: View {
             // 사용자가 취소한 경우 등 — 조용히 무시
             break
         }
+    }
+
+    /// Google 로그인 — SDK 로 ID 토큰을 받아 백엔드(provider="google")로 검증 요청.
+    private func handleGoogle() {
+        guard let presenter = Self.topViewController() else {
+            errorText = "로그인 화면을 열 수 없어요."
+            return
+        }
+        isWorking = true
+        GIDSignIn.sharedInstance.signIn(withPresenting: presenter) { result, error in
+            if let error = error as NSError? {
+                isWorking = false
+                // -5 = 사용자가 취소 → 조용히 무시
+                if error.code != -5 { errorText = "Google 로그인에 실패했어요." }
+                return
+            }
+            guard let idToken = result?.user.idToken?.tokenString else {
+                isWorking = false
+                errorText = "Google 로그인 정보를 읽지 못했어요."
+                return
+            }
+            let name = result?.user.profile?.name
+            Task {
+                defer { isWorking = false }
+                do {
+                    try await session.login(provider: "google",
+                                            identityToken: idToken,
+                                            nickname: name)
+                    errorText = nil
+                } catch let e as StardustError {
+                    errorText = e.errorDescription
+                } catch {
+                    errorText = "로그인에 실패했어요. 잠시 후 다시 시도해 주세요."
+                }
+            }
+        }
+    }
+
+    /// 현재 화면 최상단 뷰 컨트롤러(Google SDK 모달 프리젠터용).
+    private static func topViewController() -> UIViewController? {
+        let keyWindow = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first { $0.isKeyWindow }
+        var top = keyWindow?.rootViewController
+        while let presented = top?.presentedViewController { top = presented }
+        return top
     }
 }

@@ -222,3 +222,4 @@ __marimo__/
 **/.DS_Store
 .claude/
 backend/_local_storage/
+.spm-cache/

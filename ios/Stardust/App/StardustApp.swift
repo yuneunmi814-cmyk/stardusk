@@ -1,4 +1,5 @@
 import SwiftUI
+import GoogleSignIn
 
 @main
 struct StardustApp: App {
@@ -13,6 +14,10 @@ struct StardustApp: App {
                 .task {
                     // Keychain 에 저장돼 있던 토큰을 API 액터에 주입(자동 로그인)
                     await session.bootstrap()
+                }
+                // Google 로그인 리디렉트 콜백 처리(GIDClientID 는 Info.plist 에서 자동 로드)
+                .onOpenURL { url in
+                    GIDSignIn.sharedInstance.handle(url)
                 }
         }
     }

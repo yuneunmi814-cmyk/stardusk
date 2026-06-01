@@ -67,6 +67,20 @@
 		<string>tmap</string>
 	</array>
 
+	<!-- ===== Google 로그인 (GoogleSignIn) ===== -->
+	<!-- iOS OAuth client ID 와 그 reversed 값(URL scheme). secret 아님(앱 내장 식별자). -->
+	<key>GIDClientID</key>
+	<string>739267607865-3epq5qebmvleph52obrub2854hcekn1f.apps.googleusercontent.com</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.739267607865-3epq5qebmvleph52obrub2854hcekn1f</string>
+			</array>
+		</dict>
+	</array>
+
 	<!-- ===== 백엔드 Base URL (빌드 구성별: Config/*.xcconfig 에서 주입) ===== -->
 	<key>STARDUST_API_BASE_URL</key>
 	<string>$(STARDUST_API_BASE_URL)</string>
