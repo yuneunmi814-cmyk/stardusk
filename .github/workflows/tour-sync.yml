@@ -1,0 +1,45 @@
+# 경로: .github/workflows/tour-sync.yml
+# 관광 데이터 정기 동기화 — 한국관광공사 OpenAPI 전국 17개 지역을 주기적으로 재수집한다.
+#  - GitHub Actions 러너에서 직접 실행하므로 Render 인스턴스 휴면과 무관(무료·안정).
+#  - Supabase(DATABASE_URL)에 직접 UPSERT + 성향 라벨 재계산(run_all_areas).
+#
+# 필요한 레포 Secrets (Settings → Secrets and variables → Actions):
+#   - DATABASE_URL      : postgresql+asyncpg://...  (Supabase Session Pooler)
+#   - KTO_SERVICE_KEY   : 한국관광공사 OpenAPI 서비스 키
+name: 관광 데이터 정기 동기화
+
+on:
+  schedule:
+    # 매주 일요일 18:00 UTC = 월요일 03:00 KST (트래픽 낮은 시간)
+    - cron: "0 18 * * 0"
+  workflow_dispatch: {}   # 대시보드에서 수동 실행도 가능
+
+# 동시 실행 방지(이전 실행이 끝나기 전 새 실행이 겹치지 않도록)
+concurrency:
+  group: tour-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: 백엔드 의존성 설치
+        working-directory: backend
+        run: pip install .
+
+      - name: 전국 동기화 실행 (--all)
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          KTO_SERVICE_KEY: ${{ secrets.KTO_SERVICE_KEY }}
+          APP_ENV: production
+          DEBUG: "false"
+        run: python -m app.services.tour_sync --all
