@@ -48,6 +48,12 @@ final class SessionStore: ObservableObject {
         await api.setToken(auth.accessToken)
     }
 
+    /// 회원 탈퇴: 서버 데이터 파기 후 로컬 세션도 비운다.
+    func deleteAccount() async throws {
+        try await api.deleteAccount()
+        logout()
+    }
+
     /// 로그아웃: 메모리 + Keychain + API 토큰 모두 비운다.
     func logout() {
         KeychainStore.remove(K.token)

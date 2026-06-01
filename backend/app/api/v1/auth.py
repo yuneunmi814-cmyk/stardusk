@@ -106,3 +106,29 @@ async def guest_login() -> LoginResponse:
 @router.get("/me", summary="현재 토큰의 유저 정보(보호 라우트 검증용)")
 async def me(current_user: dict = Depends(get_current_user)) -> dict:
     return {"status": "success", "data": current_user}
+
+
+# 회원 탈퇴 시 사용자 관련 데이터를 자식부터 순서대로 파기(개인정보 처리방침 §3).
+# live_sessions·sky_captures·trip_coordinates 는 FK ON DELETE CASCADE 로 함께 삭제됨.
+_DELETE_ACCOUNT_SQL = [
+    "DELETE FROM content_reports WHERE reporter_user_id = :uid;",
+    "DELETE FROM user_blocks WHERE blocker_user_id = :uid OR blocked_user_id = :uid;",
+    "DELETE FROM stars WHERE user_id = :uid;",
+    "DELETE FROM sky_videos WHERE user_id = :uid;",
+    "DELETE FROM user_trips WHERE user_id = :uid;",
+    "DELETE FROM user_taste WHERE user_id = :uid;",
+    "DELETE FROM users WHERE user_id = :uid;",
+]
+
+
+@router.delete("/me", summary="회원 탈퇴(데이터 파기)")
+async def delete_account(
+    current_user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """탈퇴 — 계정과 별·여정·취향·신고/차단 등 사용자 데이터를 파기한다."""
+    uid = current_user["user_id"]
+    for stmt in _DELETE_ACCOUNT_SQL:
+        await session.execute(text(stmt), {"uid": uid})
+    await session.commit()
+    return {"status": "success", "message": "탈퇴가 완료되었습니다."}
