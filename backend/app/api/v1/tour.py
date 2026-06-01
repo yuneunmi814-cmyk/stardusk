@@ -17,6 +17,8 @@ from app.db.session import get_session
 from app.schemas.tour import (
     RegionGroup,
     RegionsResponse,
+    SpotDetailData,
+    SpotDetailResponse,
     SwipeData,
     SwipeRequest,
     SwipeResponse,
@@ -26,6 +28,7 @@ from app.schemas.tour import (
     TourSpotsResponse,
 )
 from app.services import taste as taste_service
+from app.services.tour_sync import fetch_overview
 
 router = APIRouter(prefix="/tour", tags=["tour"])
 
@@ -130,6 +133,17 @@ async def record_swipe(
             detail={"status": "error", "code": "INVALID_SWIPE_ACTION", "message": str(e)},
         )
     return SwipeResponse(data=SwipeData(**result))
+
+
+@router.get("/{content_id}/detail", response_model=SpotDetailResponse, summary="명소 상세설명(도슨트)")
+async def get_spot_detail(
+    content_id: str,
+    _user: dict = Depends(get_current_user),
+) -> SpotDetailResponse:
+    """도슨트(설명 듣기)용 상세설명. 한국관광공사 detailCommon2 의 overview 를
+    HTML 제거 후 반환한다(앱이 음성으로 읽어줌). 없으면 overview=null."""
+    overview = await fetch_overview(content_id)
+    return SpotDetailResponse(data=SpotDetailData(content_id=content_id, overview=overview))
 
 
 @router.get("/search", response_model=TourSearchResponse, summary="통합 검색(키워드+지역 필터)")

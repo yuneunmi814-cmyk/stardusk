@@ -29,6 +29,16 @@ class TourSpotsResponse(BaseModel):
     data: list[TourSpotOut]
 
 
+class SpotDetailData(BaseModel):
+    content_id: str
+    overview: str | None = Field(default=None, description="명소 상세설명(도슨트 음성용)")
+
+
+class SpotDetailResponse(BaseModel):
+    status: str = "success"
+    data: SpotDetailData
+
+
 class TourSearchData(BaseModel):
     total: int
     items: list[TourSpotOut]
