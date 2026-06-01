@@ -1,6 +1,8 @@
 import SwiftUI
 import AuthenticationServices
 import GoogleSignIn
+import KakaoSDKAuth
+import KakaoSDKUser
 
 /// 첫 진입 화면 — "당신이 머문 자리마다 별이 뜹니다".
 /// Apple 로그인을 1순위로, 소셜/게스트는 보조 진입로로 둔다.
@@ -44,7 +46,9 @@ struct LoginView: View {
                     socialButton(title: "Google 로 계속하기", system: "g.circle.fill") {
                         handleGoogle()
                     }
-                    socialButton(title: "카카오로 계속하기", system: "message.fill")
+                    socialButton(title: "카카오로 계속하기", system: "message.fill") {
+                        handleKakao()
+                    }
                     socialButton(title: "네이버로 계속하기", system: "n.square.fill")
 
                     // ③ 게스트 — 둘러보기
@@ -163,6 +167,42 @@ struct LoginView: View {
                     errorText = "로그인에 실패했어요. 잠시 후 다시 시도해 주세요."
                 }
             }
+        }
+    }
+
+    /// 카카오 로그인 — 카카오톡 앱이 있으면 앱으로, 없으면 카카오계정으로.
+    /// access_token 을 받아 백엔드(provider="kakao")로 검증 요청한다.
+    private func handleKakao() {
+        isWorking = true
+        let completion: (OAuthToken?, Error?) -> Void = { token, error in
+            if error != nil {
+                isWorking = false
+                errorText = "카카오 로그인에 실패했어요."
+                return
+            }
+            guard let accessToken = token?.accessToken else {
+                isWorking = false
+                errorText = "카카오 로그인 정보를 읽지 못했어요."
+                return
+            }
+            Task {
+                defer { isWorking = false }
+                do {
+                    try await session.login(provider: "kakao",
+                                            identityToken: accessToken,
+                                            nickname: nil)
+                    errorText = nil
+                } catch let e as StardustError {
+                    errorText = e.errorDescription
+                } catch {
+                    errorText = "로그인에 실패했어요. 잠시 후 다시 시도해 주세요."
+                }
+            }
+        }
+        if UserApi.isKakaoTalkLoginAvailable() {
+            UserApi.shared.loginWithKakaoTalk(completion: completion)
+        } else {
+            UserApi.shared.loginWithKakaoAccount(completion: completion)
         }
     }
 

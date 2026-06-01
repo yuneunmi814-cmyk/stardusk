@@ -59,16 +59,18 @@
 		<string>location</string>
 	</array>
 
-	<!-- ===== 외부 지도 앱 도보 길안내 핸드오프(딥링크 조회용) ===== -->
+	<!-- ===== 외부 지도 앱 도보 길안내 + 카카오톡 로그인(딥링크 조회용) ===== -->
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>nmap</string>
 		<string>kakaomap</string>
 		<string>tmap</string>
+		<string>kakaokakaotalk</string>
+		<string>kakaoplus</string>
 	</array>
 
-	<!-- ===== Google 로그인 (GoogleSignIn) ===== -->
-	<!-- iOS OAuth client ID 와 그 reversed 값(URL scheme). secret 아님(앱 내장 식별자). -->
+	<!-- ===== 소셜 로그인 URL scheme (Google reversed client ID + 카카오 네이티브 앱 키) ===== -->
+	<!-- 모두 앱 내장 식별자(secret 아님). -->
 	<key>GIDClientID</key>
 	<string>739267607865-3epq5qebmvleph52obrub2854hcekn1f.apps.googleusercontent.com</string>
 	<key>CFBundleURLTypes</key>
@@ -77,6 +79,12 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>com.googleusercontent.apps.739267607865-3epq5qebmvleph52obrub2854hcekn1f</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>kakaoc5b7d136888b761bd4218b2414a04f37</string>
 			</array>
 		</dict>
 	</array>
