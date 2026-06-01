@@ -87,6 +87,24 @@ actor StardustAPI {
         return env.data.items
     }
 
+    // MARK: UGC 모더레이션 — 신고 / 사용자 차단 (App Store Guideline 1.2)
+    func reportVideo(skyVideoId: String, reason: String) async throws {
+        var req = URLRequest(url: baseURL.appendingPathComponent("community/report"))
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(
+            withJSONObject: ["sky_video_id": skyVideoId, "reason": reason])
+        _ = try await run(req, as: SimpleOK.self)
+    }
+
+    func blockUser(userId: String) async throws {
+        var req = URLRequest(url: baseURL.appendingPathComponent("community/block"))
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: ["blocked_user_id": userId])
+        _ = try await run(req, as: SimpleOK.self)
+    }
+
     // MARK: 하이브리드 탐색 — 주변 명소 / 통합 검색 / 지역 목록
     func fetchNearbySpots(lat: Double, lng: Double,
                           radius: Int = 3000, limit: Int = 100) async throws -> [TourSpot] {

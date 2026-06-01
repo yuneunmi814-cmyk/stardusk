@@ -116,3 +116,24 @@ class SkyVideoCreateResponse(BaseModel):
     status: str = "success"
     message: str = "당신의 하늘이 모두의 밤하늘에 더해졌습니다."
     data: SkyVideoData
+
+
+# ---- UGC 모더레이션(신고/차단) ----
+from typing import Literal  # noqa: E402
+
+
+class ReportRequest(BaseModel):
+    sky_video_id: UUID = Field(..., description="신고할 하늘 영상 ID")
+    reason: Literal["spam", "inappropriate", "offensive", "violence", "other"] = Field(
+        ..., description="신고 사유"
+    )
+    detail: str | None = Field(default=None, max_length=500, description="상세(선택)")
+
+
+class BlockRequest(BaseModel):
+    blocked_user_id: UUID = Field(..., description="차단할 사용자 ID")
+
+
+class SimpleResponse(BaseModel):
+    status: str = "success"
+    message: str = ""

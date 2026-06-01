@@ -35,6 +35,12 @@ enum StardustError: LocalizedError {
     var code: String? { if case .server(let c, _, _) = self { return c }; return nil }
 }
 
+/// data 필드가 없는 단순 성공 응답(신고/차단 등). {status, message}
+struct SimpleOK: Decodable {
+    let status: String
+    let message: String?
+}
+
 // MARK: - 도메인 모델
 struct PaletteColor: Decodable, Hashable {
     let hex: String
