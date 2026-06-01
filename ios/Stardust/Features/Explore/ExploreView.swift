@@ -25,7 +25,12 @@ struct ExploreView: View {
             case .list: ExploreListView(vm: vm)
             }
         }
-        .task { await vm.loadMap(center: appLocation.coordinate) }
+        // 진입 시 현재 위치 자동 취득(권한 팝업 포함). 위치 설정 화면을 강제하지 않는다.
+        .task { appLocation.autoLocate() }
+        // 좌표가 갱신될 때마다(자동 취득/변경) 주변 명소 재로딩.
+        .task(id: "\(appLocation.coordinate.latitude),\(appLocation.coordinate.longitude)") {
+            await vm.loadMap(center: appLocation.coordinate)
+        }
     }
 
     private var header: some View {
