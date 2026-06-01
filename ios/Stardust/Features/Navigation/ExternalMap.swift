@@ -1,7 +1,19 @@
 import UIKit
 import MapKit
 
+/// confirmationDialog 등에서 쓰는 식별 가능한 길안내 옵션.
+struct ExternalMapOption: Identifiable {
+    let id = UUID()
+    let label: String
+    let action: () -> Void
+}
+
 enum ExternalMap {
+    /// 도보 길안내 옵션을 Identifiable 형태로 반환(설치된 지도앱 + 애플 지도 폴백).
+    static func options(to dest: CLLocationCoordinate2D, name: String) -> [ExternalMapOption] {
+        openWalking(to: dest, name: name).map { ExternalMapOption(label: $0.label, action: $0.action) }
+    }
+
     /// 도보 길안내를 외부 앱으로 위임. dest=목적지 좌표, name=표시명.
     static func openWalking(to dest: CLLocationCoordinate2D, name: String) -> [(label: String, action: () -> Void)] {
         let enc = name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""

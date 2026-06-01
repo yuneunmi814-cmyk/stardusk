@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import re
 
 import httpx
 from sqlalchemy import text
@@ -250,6 +251,27 @@ async def run_area_sync(area_code: str | None = None, num_of_rows: int = 100,
     if relabel:
         await recompute_labels()
     return total_saved
+
+
+async def fetch_overview(content_id: str) -> str | None:
+    """명소 상세설명(detailCommon2 overview)을 가져와 HTML 태그를 제거해 반환.
+
+    도슨트(설명 듣기) — 앱이 이 텍스트를 음성(TTS)으로 읽어준다. 없으면 None.
+    """
+    async with httpx.AsyncClient() as client:
+        body = await _call(client, "detailCommon2", {
+            "contentId": content_id,
+            "defaultYN": "Y",
+            "overviewYN": "Y",
+        })
+    items = _items(body)
+    if not items:
+        return None
+    raw = items[0].get("overview") or ""
+    text = re.sub(r"<[^>]+>", " ", raw)          # HTML 태그 제거
+    text = re.sub(r"&[a-zA-Z]+;", " ", text)     # &nbsp; 등 엔티티 제거
+    text = re.sub(r"\s+", " ", text).strip()
+    return text or None
 
 
 # 한국관광공사 17개 광역 지역코드 (전국).

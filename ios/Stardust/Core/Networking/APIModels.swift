@@ -41,6 +41,12 @@ struct SimpleOK: Decodable {
     let message: String?
 }
 
+/// GET /tour/{id}/detail 의 data — 도슨트(설명 듣기)용 상세설명.
+struct SpotDetail: Decodable {
+    let contentId: String
+    let overview: String?
+}
+
 // MARK: - 도메인 모델
 struct PaletteColor: Decodable, Hashable {
     let hex: String

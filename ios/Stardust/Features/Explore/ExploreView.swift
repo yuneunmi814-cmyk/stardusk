@@ -10,6 +10,7 @@ struct ExploreView: View {
 
     private enum Mode: String, CaseIterable { case map = "지도로 탐색", list = "리스트로 탐색" }
     @State private var mode: Mode = .map
+    @State private var showCuration = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -21,7 +22,11 @@ struct ExploreView: View {
             .padding(.horizontal, 16).padding(.bottom, 8)
 
             switch mode {
-            case .map:  ExploreMapView(vm: vm)
+            case .map:
+                ExploreMapView(vm: vm) {
+                    showCuration = true
+                    Task { await vm.loadDeck(center: appLocation.coordinate) }
+                }
             case .list: ExploreListView(vm: vm)
             }
         }
@@ -30,6 +35,18 @@ struct ExploreView: View {
         // 좌표가 갱신될 때마다(자동 취득/변경) 주변 명소 재로딩.
         .task(id: "\(appLocation.coordinate.latitude),\(appLocation.coordinate.longitude)") {
             await vm.loadMap(center: appLocation.coordinate)
+        }
+        // 풀스크린 추천 카드 — 탭바는 유지(시트 대신 탭 콘텐츠 위 오버레이).
+        .overlay {
+            if showCuration {
+                SpotCurationView(
+                    spots: vm.deckSpots.isEmpty ? vm.mapSpots : vm.deckSpots,
+                    vm: vm,
+                    onClose: { withAnimation { showCuration = false } },
+                    onLike: { liked in vm.selectedSpot = liked }
+                )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
     }
 
@@ -52,8 +69,8 @@ struct ExploreView: View {
 struct ExploreMapView: View {
     @ObservedObject var vm: ExploreViewModel
     @EnvironmentObject private var appLocation: AppLocation
+    var onExplore: () -> Void
     @State private var camera: MapCameraPosition = .automatic
-    @State private var showCuration = false
 
     /// [지도로 탐색] 내부 2단 토글 — 화면 스킨만 바뀌고 데이터는 동일하게 싱크.
     /// 스카이 뷰가 앱의 메인 홈 비주얼이므로 기본값으로 고정.
@@ -78,10 +95,7 @@ struct ExploreMapView: View {
                         ExploreSkyMapView(spots: vm.mapSpots,
                                           center: appLocation.coordinate,
                                           selectedSpot: $vm.selectedSpot,
-                                          onExplore: {
-                                              showCuration = true
-                                              Task { await vm.loadDeck(center: appLocation.coordinate) }
-                                          })
+                                          onExplore: onExplore)
                     }
                 }
                 .transition(.opacity)
@@ -104,15 +118,6 @@ struct ExploreMapView: View {
             }
         }
         .animation(.easeInOut(duration: 0.35), value: skyMode)
-        .sheet(isPresented: $showCuration) {
-            // 원버튼 큐레이션: 취향 반영 덱(deck_rank)을 우선, 비면 주변 마커로 폴백.
-            // 라이크 시 홈(스카이 뷰)에 경로 궤도 + 길안내 카드 활성화
-            SpotCurationSheet(spots: vm.deckSpots.isEmpty ? vm.mapSpots : vm.deckSpots, vm: vm) { liked in
-                withAnimation(.spring) { vm.selectedSpot = liked }
-            }
-            .presentationDetents([.height(440), .large])
-            .presentationDragIndicator(.visible)
-        }
     }
 
     // 일반 지도 뷰 — 네이티브 현실 지도 + OpenAPI 관광지 마커

@@ -145,6 +145,13 @@ actor StardustAPI {
         return try await run(req, as: APIEnvelope<[TourSpot]>.self).data
     }
 
+    /// 도슨트(설명 듣기) — 명소 상세설명(overview)을 가져온다.
+    func fetchSpotDetail(tourId: String) async throws -> SpotDetail {
+        var req = URLRequest(url: baseURL.appendingPathComponent("tour/\(tourId)/detail"))
+        req.httpMethod = "GET"
+        return try await run(req, as: APIEnvelope<SpotDetail>.self).data
+    }
+
     /// 카드 스와이프(Like/Pass/Refresh)를 취향 학습에 반영. 갱신된 taste_score 반환.
     @discardableResult
     func postSwipe(tourId: String, action: String) async throws -> SwipeResult {
