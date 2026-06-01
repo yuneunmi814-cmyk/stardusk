@@ -41,6 +41,13 @@ final class SessionStore: ObservableObject {
         await api.setToken(auth.accessToken)
     }
 
+    /// 게스트 둘러보기: 서버에서 익명 토큰을 받아 입장한다(소셜 로그인 불필요).
+    func guestLogin() async throws {
+        let auth = try await api.guestLogin()
+        persist(token: auth.accessToken, userId: auth.userId, nickname: auth.nickname)
+        await api.setToken(auth.accessToken)
+    }
+
     /// 로그아웃: 메모리 + Keychain + API 토큰 모두 비운다.
     func logout() {
         KeychainStore.remove(K.token)

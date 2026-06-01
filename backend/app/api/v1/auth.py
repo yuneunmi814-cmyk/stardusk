@@ -6,6 +6,8 @@
 # 소셜 토큰 검증은 app.services.social_auth 가 Apple/Google 공개키(JWKS)로 수행한다.
 # 클라이언트가 보낸 user_id/email 은 신뢰하지 않고, 토큰 서명에서 얻은 sub 만 신뢰한다.
 
+import uuid
+
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import APIRouter, Depends
@@ -75,6 +77,26 @@ async def login(
         data=LoginData(
             user_id=user["user_id"],
             nickname=user["nickname"],
+            access_token=access_token,
+            expires_in=expires_in,
+        )
+    )
+
+
+@router.post("/guest", response_model=LoginResponse, summary="게스트(비로그인) 둘러보기 토큰")
+async def guest_login() -> LoginResponse:
+    """로그인 없이 둘러보기 — 임시 익명 사용자에게 내부 JWT 를 발급한다.
+
+    소셜 검증 없이 즉시 발급되며, 매 호출마다 새로운 익명 user_id 를 부여한다.
+    탐색/피드 등 읽기 기능을 토큰 기반으로 그대로 이용할 수 있다(기록은 비영구).
+    """
+    user_id = str(uuid.uuid4())
+    nickname = "둘러보는 여행자"
+    access_token, expires_in = create_access_token(user_id=user_id, nickname=nickname)
+    return LoginResponse(
+        data=LoginData(
+            user_id=user_id,
+            nickname=nickname,
             access_token=access_token,
             expires_in=expires_in,
         )
