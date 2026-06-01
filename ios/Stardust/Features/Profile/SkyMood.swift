@@ -43,7 +43,7 @@ enum SkyMood {
         case .clearDay: return [Color(hex:"#5794E4"), Color(hex:"#8FBEF0"), Color(hex:"#CFE5FB")]
         case .sunshine: return [Color(hex:"#7EC8F2"), Color(hex:"#BFE3F5"), Color(hex:"#FCEFB0")]
         case .sunset:   return [Color(hex:"#5B3A82"), Color(hex:"#E8746B"), Color(hex:"#FBC18B")]
-        case .night:    return [Color(hex:"#070B1E"), Color(hex:"#1B2350"), Color(hex:"#3A4A86")]
+        case .night:    return [Color(hex:"#0A1130"), Color(hex:"#16224D"), Color(hex:"#2B3E7A")]
         case .deepBlue: return [Color(hex:"#16306B"), Color(hex:"#2456A6"), Color(hex:"#5E8FD6")]
         case .clouds:   return [Color(hex:"#DCE7F2"), Color(hex:"#EAF1F8"), Color(hex:"#F8FBFE")]
         case .overcast: return [Color(hex:"#8A95A3"), Color(hex:"#AEB7C2"), Color(hex:"#D2D8DF")]
