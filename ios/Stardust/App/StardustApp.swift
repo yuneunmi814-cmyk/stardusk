@@ -27,8 +27,10 @@ struct StardustApp: App {
                 .onOpenURL { url in
                     if AuthApi.isKakaoTalkLoginUrl(url) {
                         _ = AuthController.handleOpenUrl(url: url)
+                    } else if url.scheme == "stardust" {
+                        NaverLoginManager.shared.handleURL(url)   // 네이버 콜백
                     } else {
-                        GIDSignIn.sharedInstance.handle(url)
+                        GIDSignIn.sharedInstance.handle(url)      // Google 콜백
                     }
                 }
         }

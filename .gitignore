@@ -223,3 +223,6 @@ __marimo__/
 .claude/
 backend/_local_storage/
 .spm-cache/
+
+# iOS 로컬 시크릿(네이버 등) — 커밋 금지
+ios/Config/Secrets.xcconfig

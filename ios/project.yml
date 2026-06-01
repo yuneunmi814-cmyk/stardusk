@@ -23,6 +23,9 @@ packages:
   KakaoOpenSDK:
     url: https://github.com/kakao/kakao-ios-sdk
     from: "2.11.0"
+  NaverThirdPartyLogin:
+    url: https://github.com/naver/naveridlogin-sdk-ios
+    from: "4.2.3"
 
 targets:
   Stardust:
@@ -39,6 +42,8 @@ targets:
         product: KakaoSDKAuth
       - package: KakaoOpenSDK
         product: KakaoSDKUser
+      - package: NaverThirdPartyLogin
+        product: NaverThirdPartyLogin
     # Debug/Release 별 API 호스트는 Config/*.xcconfig 로 주입한다(소스 밖에 둬서
     # 리소스로 포함되지 않게 한다). 값은 Info.plist 의 STARDUST_API_BASE_URL 로 흘러간다.
     configFiles:

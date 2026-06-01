@@ -59,7 +59,7 @@
 		<string>location</string>
 	</array>
 
-	<!-- ===== 외부 지도 앱 도보 길안내 + 카카오톡 로그인(딥링크 조회용) ===== -->
+	<!-- ===== 외부 지도 앱 + 카카오톡/네이버 로그인(딥링크 조회용) ===== -->
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>nmap</string>
@@ -67,7 +67,15 @@
 		<string>tmap</string>
 		<string>kakaokakaotalk</string>
 		<string>kakaoplus</string>
+		<string>naversearchapp</string>
+		<string>naversearchthirdlogin</string>
 	</array>
+
+	<!-- ===== 네이버 로그인(네아로) — 자격증명은 gitignore된 Secrets.xcconfig 에서 주입 ===== -->
+	<key>NAVER_CONSUMER_KEY</key>
+	<string>$(NAVER_CONSUMER_KEY)</string>
+	<key>NAVER_CONSUMER_SECRET</key>
+	<string>$(NAVER_CONSUMER_SECRET)</string>
 
 	<!-- ===== 소셜 로그인 URL scheme (Google reversed client ID + 카카오 네이티브 앱 키) ===== -->
 	<!-- 모두 앱 내장 식별자(secret 아님). -->
@@ -85,6 +93,12 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>kakaoc5b7d136888b761bd4218b2414a04f37</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>stardust</string>
 			</array>
 		</dict>
 	</array>

@@ -49,7 +49,9 @@ struct LoginView: View {
                     socialButton(title: "카카오로 계속하기", system: "message.fill") {
                         handleKakao()
                     }
-                    socialButton(title: "네이버로 계속하기", system: "n.square.fill")
+                    socialButton(title: "네이버로 계속하기", system: "n.square.fill") {
+                        handleNaver()
+                    }
 
                     // ③ 게스트 — 둘러보기
                     Button {
@@ -203,6 +205,32 @@ struct LoginView: View {
             UserApi.shared.loginWithKakaoTalk(completion: completion)
         } else {
             UserApi.shared.loginWithKakaoAccount(completion: completion)
+        }
+    }
+
+    /// 네이버 로그인 — SDK 로 access_token 을 받아 백엔드(provider="naver")로 검증.
+    private func handleNaver() {
+        isWorking = true
+        NaverLoginManager.shared.login { result in
+            switch result {
+            case .failure:
+                isWorking = false
+                errorText = "네이버 로그인에 실패했어요."
+            case .success(let accessToken):
+                Task {
+                    defer { isWorking = false }
+                    do {
+                        try await session.login(provider: "naver",
+                                                identityToken: accessToken,
+                                                nickname: nil)
+                        errorText = nil
+                    } catch let e as StardustError {
+                        errorText = e.errorDescription
+                    } catch {
+                        errorText = "로그인에 실패했어요. 잠시 후 다시 시도해 주세요."
+                    }
+                }
+            }
         }
     }
 
