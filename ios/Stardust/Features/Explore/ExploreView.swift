@@ -60,8 +60,13 @@ struct ExploreView: View {
             }
             Spacer()
             Button { showSettings = true } label: {
-                Image(systemName: "gearshape.fill").font(.body).foregroundStyle(.secondary)
+                Image(systemName: "line.3.horizontal")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 40, height: 40)
+                    .contentShape(Rectangle())
             }
+            .accessibilityLabel("메뉴")
         }
         .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 6)
         .sheet(isPresented: $showSettings) { SettingsView() }
