@@ -23,23 +23,23 @@ struct StarfieldOverlay: View {
     let date: Date
     var bright: Bool = true
 
-    private struct Star { let x, y: CGFloat; let delay: Double }
-    // HTML seedStars(): 34개, left 0~100%, top 0~70%, animationDelay 0~3s
-    private let stars: [Star] = (0..<34).map { _ in
-        Star(x: .random(in: 0...1), y: .random(in: 0...0.7), delay: .random(in: 0...3))
+    private struct Star { let x, y, r: CGFloat; let delay: Double }
+    // 잔잔한 밤하늘 — 24개, 상단 72% 영역, 각자 매우 느린 위상.
+    private let stars: [Star] = (0..<24).map { _ in
+        Star(x: .random(in: 0...1), y: .random(in: 0...0.72),
+             r: .random(in: 0.7...1.3), delay: .random(in: 0...6))
     }
 
     var body: some View {
         Canvas { ctx, size in
             let t = date.timeIntervalSinceReferenceDate
-            let dim = bright ? 1.0 : 0.55          // 밝은 무드가 아니면 살짝 어둡게
+            let dim = bright ? 1.0 : 0.6
             for s in stars {
-                // 3초 주기 ease-in-out: p 0→0.5→1 동안 f 가 0→1→0
-                let p = ((t + s.delay).truncatingRemainder(dividingBy: 3)) / 3
+                // 6초 주기로 '밝기만' 아주 미세하게(0.38~0.70). 크기 변화 없음 → 산만하지 않게.
+                let p = ((t + s.delay).truncatingRemainder(dividingBy: 6)) / 6
                 let f = 0.5 - 0.5 * cos(2 * .pi * p)
-                let opacity = (0.15 + 0.80 * f) * dim
-                let scale = 0.7 + 0.55 * f
-                let d = 2.0 * scale                // HTML 별 크기 2px
+                let opacity = (0.38 + 0.32 * f) * dim
+                let d = s.r * 2                    // 고정 크기(스케일 펄스 제거)
                 let rect = CGRect(x: s.x * size.width - d / 2,
                                   y: s.y * size.height - d / 2, width: d, height: d)
                 ctx.opacity = opacity
