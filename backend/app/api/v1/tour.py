@@ -32,6 +32,14 @@ from app.services.tour_sync import fetch_overview
 
 router = APIRouter(prefix="/tour", tags=["tour"])
 
+# KTO 데이터에 관광지/문화시설로 느슨하게 분류돼 섞여 들어오는 관변·행정 시설을
+# 이름으로 제외한다(시청·노인회·복지관 등). POSIX 정규식, spot_name !~ 로 사용.
+_CIVIC_NAME_RX = (
+    "(시청|군청|구청|도청|행정복지센터|주민센터|행정센터|면사무소|읍사무소|동사무소|"
+    "보건소|보건지소|우체국|경찰서|파출소|지구대|소방서|세무서|등기소|교육청|법원|"
+    "노인회|부녀회|청년회|번영회|자치회|협회|지회|연합회|복지관|행정역사관)"
+)
+
 # 입력 점은 ST_MakePoint(경도, 위도) → SRID 4326. 거리는 geography 캐스팅으로 미터.
 _NEARBY_SQL = text(
     """
@@ -50,7 +58,8 @@ _NEARBY_SQL = text(
         ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography,
         :radius
     )
-      AND content_type_id IN ('12','14','15','25','28')  -- 관광지·문화시설·축제·여행코스·레포츠 (숙박/쇼핑/음식점 제외)
+      AND content_type_id IN ('12','14','25','28')  -- 관광지·문화시설·여행코스·레포츠 (숙박/쇼핑/음식점/축제 제외)
+      AND spot_name !~ '""" + _CIVIC_NAME_RX + """'      -- 시청·노인회 등 관변/행정 시설 이름 제외
     ORDER BY distance_meters ASC
     LIMIT :limit;
     """
@@ -201,8 +210,11 @@ async def search_spots(
     if has_origin:
         ensure_korea_coords(latitude, longitude)
 
-    # 관광지·문화시설·축제·여행코스·레포츠만 (숙박/쇼핑/음식점 제외)
-    where: list[str] = ["content_type_id IN ('12','14','15','25','28')"]
+    # 관광지·문화시설·축제·여행코스·레포츠만 (숙박/쇼핑/음식점 제외) + 관변·행정 시설 이름 제외
+    where: list[str] = [
+        "content_type_id IN ('12','14','25','28')",
+        f"spot_name !~ '{_CIVIC_NAME_RX}'",
+    ]
     params: dict = {"limit": limit, "offset": offset}
 
     if keyword:
