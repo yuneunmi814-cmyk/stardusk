@@ -13,6 +13,7 @@ struct ExploreView: View {
     @State private var camera: MapCameraPosition = .automatic
     @AppStorage("didPrimeLocation") private var didPrime = false
     @State private var showPriming = false
+    @State private var centeredAt: CLLocationCoordinate2D?   // 마지막으로 지도를 맞춘 좌표
 
     var body: some View {
         VStack(spacing: 0) {
@@ -24,9 +25,9 @@ struct ExploreView: View {
             if didPrime { appLocation.autoLocate() } else { showPriming = true }
         }
         .overlay { if showPriming { primingCard } }
-        // 좌표가 갱신될 때마다 주변 명소 재로딩 + 지도 재중심.
+        // 좌표가 갱신될 때마다 주변 명소 재로딩 + (큰 이동일 때만) 지도 재중심.
         .task(id: "\(appLocation.coordinate.latitude),\(appLocation.coordinate.longitude)") {
-            recenter()
+            recenterIfNeeded()
             await vm.loadMap(center: appLocation.coordinate)
         }
         // 풀스크린 추천 카드 — 탭바 유지(시트 대신 오버레이).
@@ -127,9 +128,18 @@ struct ExploreView: View {
         }
     }
 
-    private func recenter() {
+    /// 지도를 현재 위치로 맞춘다 — 단, 사용자의 줌/이동을 덮어쓰지 않도록
+    /// '처음' 또는 '의미 있는 이동(>800m)'일 때만 재중심한다. (GPS 미세 갱신엔 무반응)
+    private func recenterIfNeeded() {
+        let c = appLocation.coordinate
+        if let last = centeredAt {
+            let moved = CLLocation(latitude: last.latitude, longitude: last.longitude)
+                .distance(from: CLLocation(latitude: c.latitude, longitude: c.longitude))
+            if moved < 800 { return }
+        }
+        centeredAt = c
         camera = .region(MKCoordinateRegion(
-            center: appLocation.coordinate,
+            center: c,
             span: MKCoordinateSpan(latitudeDelta: 0.06, longitudeDelta: 0.06)))
     }
 
