@@ -63,6 +63,7 @@ _DECK_SQL = text(
             :radius
         )
           AND content_type_id IN ('12','14','15','25','28')  -- 관광지·문화시설·축제·여행코스·레포츠 (숙박/쇼핑/음식점 제외)
+          AND spot_name !~ '(시청|군청|구청|도청|행정복지센터|주민센터|행정센터|면사무소|읍사무소|동사무소|보건소|보건지소|우체국|경찰서|파출소|지구대|소방서|세무서|등기소|교육청|법원|노인회|부녀회|청년회|번영회|자치회|협회|지회|연합회|복지관|행정역사관)'  -- 관변·행정 시설 제외
     )
     SELECT
         tour_id, spot_name, region, address, image_url, label, popularity_score,
