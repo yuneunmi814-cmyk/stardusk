@@ -41,9 +41,7 @@ struct SavedView: View {
     private func row(_ spot: TourSpot) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
-                AsyncImage(url: spot.imageURL) { img in
-                    img.resizable().scaledToFill()
-                } placeholder: {
+                SpotImage(url: spot.imageURL) {
                     LinearGradient(colors: [Color(hex: "#8FBEF0"), Color(hex: "#CFE5FB")],
                                    startPoint: .top, endPoint: .bottom)
                 }

@@ -166,9 +166,7 @@ struct SpotCardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ZStack(alignment: .topTrailing) {
-                AsyncImage(url: spot.imageURL) { img in
-                    img.resizable().scaledToFill()
-                } placeholder: {
+                SpotImage(url: spot.imageURL) {
                     LinearGradient(colors: [Color(hex: "#8FBEF0"), Color(hex: "#CFE5FB")],
                                    startPoint: .top, endPoint: .bottom)
                 }
