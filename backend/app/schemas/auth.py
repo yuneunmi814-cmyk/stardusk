@@ -8,12 +8,8 @@ from pydantic import BaseModel, Field
 
 class LoginRequest(BaseModel):
     """POST /api/v1/auth/login 요청 바디."""
-    provider: Literal["apple", "google", "kakao", "naver"] = Field(..., examples=["apple"])
-    identity_token: str = Field(
-        ...,
-        description="소셜 제공자 토큰. apple/google 은 ID 토큰(JWT), "
-                    "kakao/naver 는 OAuth access_token 을 담는다.",
-    )
+    provider: Literal["apple", "google"] = Field(..., examples=["apple"])
+    identity_token: str = Field(..., description="소셜 제공자가 발급한 ID 토큰(JWT)")
     nickname: str | None = Field(default=None, examples=["푸른요정"])
 
 
