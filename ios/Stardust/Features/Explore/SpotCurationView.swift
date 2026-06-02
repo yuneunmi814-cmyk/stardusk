@@ -114,7 +114,7 @@ struct SpotCurationView: View {
                 }
                 HStack(spacing: 10) {
                     cardChip("길찾기", "location.north.line.fill") { startNavigation(spot) }
-                    cardChip(docent.speakingId == spot.id ? "정지" : "도슨트",
+                    cardChip(docent.speakingId == spot.id ? "정지" : "안내 듣기",
                              docentLoadingId == spot.id ? "hourglass" :
                                 (docent.speakingId == spot.id ? "stop.fill" : "speaker.wave.2.fill")) {
                         toggleDocent(spot)
