@@ -69,7 +69,7 @@ struct ExploreView: View {
     // MARK: 지도 + 하단 컨트롤
     private var mapArea: some View {
         ZStack(alignment: .bottom) {
-            Map(position: $camera) {
+            Map(position: $camera, interactionModes: .all) {
                 UserAnnotation()
                 ForEach(vm.mapSpots) { spot in
                     Annotation(spot.spotName,
@@ -116,8 +116,8 @@ struct ExploreView: View {
             Task { await vm.loadDeck(center: appLocation.coordinate) }
         } label: {
             HStack(spacing: 8) {
-                Image(systemName: "sparkles").font(.headline)
-                Text("내 주변 관광지 찾기").font(.callout.weight(.semibold))
+                Image(systemName: "magnifyingglass").font(.headline)
+                Text("내 주변 관광지 탐색").font(.callout.weight(.semibold))
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 24).frame(height: 54)
