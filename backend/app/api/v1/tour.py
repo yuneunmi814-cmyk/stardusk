@@ -50,6 +50,7 @@ _NEARBY_SQL = text(
         ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography,
         :radius
     )
+      AND content_type_id IN ('12','14','15','25','28')  -- 관광지·문화시설·축제·여행코스·레포츠 (숙박/쇼핑/음식점 제외)
     ORDER BY distance_meters ASC
     LIMIT :limit;
     """
@@ -200,7 +201,8 @@ async def search_spots(
     if has_origin:
         ensure_korea_coords(latitude, longitude)
 
-    where: list[str] = []
+    # 관광지·문화시설·축제·여행코스·레포츠만 (숙박/쇼핑/음식점 제외)
+    where: list[str] = ["content_type_id IN ('12','14','15','25','28')"]
     params: dict = {"limit": limit, "offset": offset}
 
     if keyword:
