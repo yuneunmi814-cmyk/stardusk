@@ -62,6 +62,7 @@ _DECK_SQL = text(
             ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography,
             :radius
         )
+          AND content_type_id IN ('12','14','15','25','28')  -- 관광지·문화시설·축제·여행코스·레포츠 (숙박/쇼핑/음식점 제외)
     )
     SELECT
         tour_id, spot_name, region, address, image_url, label, popularity_score,

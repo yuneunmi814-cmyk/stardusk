@@ -85,23 +85,29 @@ struct SpotCurationView: View {
 
     private func card(_ spot: TourSpot) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            ZStack(alignment: .topLeading) {
-                AsyncImage(url: spot.imageURL) { img in
-                    img.resizable().scaledToFill()
-                } placeholder: {
-                    LinearGradient(colors: [Color(hex: "#3A4A86"), Color(hex: "#16224D")],
-                                   startPoint: .top, endPoint: .bottom)
+            // Color.clear 가 레이아웃 크기(가로=카드폭, 세로=320)를 고정하고,
+            // 이미지는 overlay 로만 채워 scaledToFill 이 카드 폭을 밀어내지 못하게 한다.
+            Color.clear
+                .frame(maxWidth: .infinity)
+                .frame(height: 320)
+                .overlay {
+                    AsyncImage(url: spot.imageURL) { img in
+                        img.resizable().scaledToFill()
+                    } placeholder: {
+                        LinearGradient(colors: [Color(hex: "#3A4A86"), Color(hex: "#16224D")],
+                                       startPoint: .top, endPoint: .bottom)
+                    }
                 }
-                .frame(maxWidth: .infinity).frame(height: 360).clipped()
-
-                if let badge = spot.tasteBadge {
-                    Label(badge.text, systemImage: badge.symbol)
-                        .font(.caption.weight(.bold))
-                        .padding(.horizontal, 10).padding(.vertical, 6)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .padding(14)
+                .clipped()
+                .overlay(alignment: .topLeading) {
+                    if let badge = spot.tasteBadge {
+                        Label(badge.text, systemImage: badge.symbol)
+                            .font(.caption.weight(.bold))
+                            .padding(.horizontal, 10).padding(.vertical, 6)
+                            .background(.ultraThinMaterial, in: Capsule())
+                            .padding(14)
+                    }
                 }
-            }
 
             VStack(alignment: .leading, spacing: 10) {
                 Text(spot.spotName).font(.title2.weight(.bold)).lineLimit(2)
@@ -126,6 +132,7 @@ struct SpotCurationView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
+        .clipShape(RoundedRectangle(cornerRadius: 24))   // 이미지 모서리가 카드 둥근모서리 밖으로 안 나가게
         .shadow(color: .black.opacity(0.3), radius: 18, y: 8)
     }
 
