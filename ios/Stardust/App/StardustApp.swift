@@ -23,29 +23,26 @@ struct StardustApp: App {
     }
 }
 
-/// 로그인 → 메인 탭(담기·탐색·피드). 위치는 탐색탭에서 자동 취득하고,
+/// 로그인 → 메인 탭(탐색·저장). 위치는 탐색탭에서 자동 취득하고,
 /// '변경'을 누를 때만 위치 설정 지도를 전체화면으로 띄운다.
 struct RootView: View {
     @EnvironmentObject private var session: SessionStore
     @EnvironmentObject private var appLocation: AppLocation
-    @State private var tab = 1   // 가운데(탐색) 기본 선택
+    @State private var tab = 0   // 탐색 기본 선택
 
     var body: some View {
         if !session.isAuthenticated {
             LoginView()                       // 소셜 로그인 / 게스트 둘러보기
         } else {
             TabView(selection: $tab) {
-                CaptureFlowView()             // 입력 Zero 촬영 루프
-                    .tabItem { Label("담기", systemImage: "camera.fill") }
-                    .tag(0)
-                ExploreView()                 // 메인 홈 — 하이브리드 탐색
+                ExploreView()                 // 메인 홈 — 주변 관광지 탐색
                     .tabItem { Label("탐색", systemImage: "map.fill") }
+                    .tag(0)
+                SavedView()                   // 라이크(찜)한 관광지 모음
+                    .tabItem { Label("저장", systemImage: "heart.fill") }
                     .tag(1)
-                TrendingFeedView()            // 피드(다른 여행자들의 하늘)
-                    .tabItem { Label("피드", systemImage: "sparkles") }
-                    .tag(2)
             }
-            .tint(.white)
+            .tint(Color(hex: "#5794E4"))
             // 사용자가 '변경'을 눌렀을 때만 위치 설정 지도를 띄운다.
             .fullScreenCover(isPresented: Binding(
                 get: { appLocation.isPickingManually },

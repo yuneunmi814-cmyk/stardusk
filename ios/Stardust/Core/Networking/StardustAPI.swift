@@ -152,6 +152,21 @@ actor StardustAPI {
         return try await run(req, as: APIEnvelope<[TourSpot]>.self).data
     }
 
+    /// 저장(라이크)한 명소 목록.
+    func fetchSavedSpots() async throws -> [TourSpot] {
+        var req = URLRequest(url: baseURL.appendingPathComponent("tour/saved"))
+        req.httpMethod = "GET"
+        return try await run(req, as: APIEnvelope<[TourSpot]>.self).data
+    }
+
+    /// 저장 해제 → 갱신된 저장 목록 반환.
+    @discardableResult
+    func unsaveSpot(tourId: String) async throws -> [TourSpot] {
+        var req = URLRequest(url: baseURL.appendingPathComponent("tour/saved/\(tourId)"))
+        req.httpMethod = "DELETE"
+        return try await run(req, as: APIEnvelope<[TourSpot]>.self).data
+    }
+
     /// 도슨트(설명 듣기) — 명소 상세설명(overview)을 가져온다.
     func fetchSpotDetail(tourId: String) async throws -> SpotDetail {
         var req = URLRequest(url: baseURL.appendingPathComponent("tour/\(tourId)/detail"))

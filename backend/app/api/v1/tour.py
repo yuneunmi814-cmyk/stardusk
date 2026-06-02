@@ -135,6 +135,44 @@ async def record_swipe(
     return SwipeResponse(data=SwipeData(**result))
 
 
+_SAVED_SQL = text(
+    """
+    SELECT ts.content_id AS tour_id, ts.spot_name, ts.region, ts.address, ts.image_url,
+           ts.label, ts.popularity_score,
+           ST_Y(ts.location) AS latitude, ST_X(ts.location) AS longitude,
+           NULL::double precision AS distance_meters
+    FROM saved_spots s
+    JOIN tour_spots ts ON ts.content_id = s.content_id
+    WHERE s.user_id = :uid
+    ORDER BY s.saved_at DESC;
+    """
+)
+
+
+@router.get("/saved", response_model=TourSpotsResponse, summary="저장(라이크)한 명소 목록")
+async def get_saved_spots(
+    user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> TourSpotsResponse:
+    rows = (await session.execute(_SAVED_SQL, {"uid": user["user_id"]})).mappings().all()
+    return TourSpotsResponse(data=[_row_to_spot(r, with_distance=False) for r in rows])
+
+
+@router.delete("/saved/{content_id}", response_model=TourSpotsResponse, summary="저장 해제")
+async def unsave_spot(
+    content_id: str,
+    user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> TourSpotsResponse:
+    await session.execute(
+        text("DELETE FROM saved_spots WHERE user_id = :uid AND content_id = :cid;"),
+        {"uid": user["user_id"], "cid": content_id},
+    )
+    await session.commit()
+    rows = (await session.execute(_SAVED_SQL, {"uid": user["user_id"]})).mappings().all()
+    return TourSpotsResponse(data=[_row_to_spot(r, with_distance=False) for r in rows])
+
+
 @router.get("/{content_id}/detail", response_model=SpotDetailResponse, summary="명소 상세설명(도슨트)")
 async def get_spot_detail(
     content_id: str,

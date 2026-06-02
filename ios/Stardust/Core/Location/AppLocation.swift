@@ -8,7 +8,7 @@ final class AppLocation: NSObject, ObservableObject {
     /// 탐색 기준 좌표(확정 전엔 GPS 또는 기본값).
     @Published var coordinate: CLLocationCoordinate2D
     /// 화면에 표시할 위치명(역지오코딩 또는 검색 결과명).
-    @Published var displayName: String = "현재 위치"
+    @Published var displayName: String = "현위치"
     /// 탐색을 시작할 위치가 확정됐는지(자동 취득 또는 직접 설정 완료).
     @Published private(set) var isConfirmed = false
     /// 사용자가 '변경'을 눌러 직접 위치를 고르는 중인지(이때만 설정 지도 화면 노출).
@@ -95,7 +95,7 @@ extension AppLocation: CLLocationManagerDelegate {
         ) { [weak self] placemarks, _ in
             guard let p = placemarks?.first else { return }
             let parts = [p.locality, p.subLocality ?? p.thoroughfare].compactMap { $0 }
-            let name = parts.isEmpty ? "현재 위치" : parts.prefix(2).joined(separator: " ")
+            let name = parts.isEmpty ? "현위치" : parts.prefix(2).joined(separator: " ")
             Task { @MainActor in self?.displayName = name }
         }
     }

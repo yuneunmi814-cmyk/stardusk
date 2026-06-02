@@ -11,14 +11,19 @@ struct ExploreView: View {
     @State private var showCuration = false
     @State private var showSettings = false
     @State private var camera: MapCameraPosition = .automatic
+    @AppStorage("didPrimeLocation") private var didPrime = false
+    @State private var showPriming = false
 
     var body: some View {
         VStack(spacing: 0) {
             header
             mapArea
         }
-        // 진입 시 현재 위치 자동 취득(권한 팝업 포함).
-        .task { appLocation.autoLocate() }
+        // 권한 안내(priming)를 한 번 보여준 뒤에 위치를 요청한다.
+        .task {
+            if didPrime { appLocation.autoLocate() } else { showPriming = true }
+        }
+        .overlay { if showPriming { primingCard } }
         // 좌표가 갱신될 때마다 주변 명소 재로딩 + 지도 재중심.
         .task(id: "\(appLocation.coordinate.latitude),\(appLocation.coordinate.longitude)") {
             recenter()
@@ -69,13 +74,8 @@ struct ExploreView: View {
                 ForEach(vm.mapSpots) { spot in
                     Annotation(spot.spotName,
                                coordinate: .init(latitude: spot.latitude, longitude: spot.longitude)) {
-                        Button { withAnimation(.spring) { vm.selectedSpot = spot } } label: {
-                            Image(systemName: "star.circle.fill")
-                                .font(.title)
-                                .foregroundStyle(.white, Color(hex: "#5794E4"))
-                                .shadow(radius: 3)
-                                .scaleEffect(vm.selectedSpot == spot ? 1.25 : 1)
-                        }
+                        StarDot(selected: vm.selectedSpot == spot)
+                            .onTapGesture { withAnimation(.spring) { vm.selectedSpot = spot } }
                     }
                 }
             }
@@ -131,6 +131,51 @@ struct ExploreView: View {
         camera = .region(MKCoordinateRegion(
             center: appLocation.coordinate,
             span: MKCoordinateSpan(latitudeDelta: 0.06, longitudeDelta: 0.06)))
+    }
+
+    // 위치 권한 안내(priming) — iOS 시스템 팝업 전에 맥락을 먼저 설명.
+    private var primingCard: some View {
+        ZStack {
+            Color.black.opacity(0.35).ignoresSafeArea()
+            VStack(spacing: 14) {
+                Image(systemName: "location.circle.fill")
+                    .font(.system(size: 44)).foregroundStyle(Color(hex: "#5794E4"))
+                Text("내 주변 관광지를 찾을게요").font(.headline)
+                Text("현재 위치를 기준으로 가까운 명소를 보여드려요.\n위치 권한을 허용해 주세요.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                Button {
+                    didPrime = true
+                    showPriming = false
+                    appLocation.autoLocate()       // 이제 iOS 권한 팝업
+                } label: {
+                    Text("허용하고 시작").font(.headline)
+                        .frame(maxWidth: .infinity).frame(height: 50)
+                        .background(Color(hex: "#5794E4"), in: RoundedRectangle(cornerRadius: 14))
+                        .foregroundStyle(.white)
+                }
+            }
+            .padding(22)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22))
+            .padding(.horizontal, 36)
+        }
+    }
+}
+
+/// 지도 마커 — HTML 별처럼 작은 빛나는 점. 선택 시 커진다.
+struct StarDot: View {
+    var selected: Bool
+    var body: some View {
+        ZStack {
+            Circle().fill(Color(hex: "#5794E4").opacity(0.35))
+                .frame(width: selected ? 26 : 18, height: selected ? 26 : 18).blur(radius: 4)
+            Circle().fill(.white)
+                .frame(width: selected ? 12 : 8, height: selected ? 12 : 8)
+                .overlay(Circle().stroke(Color(hex: "#5794E4"), lineWidth: selected ? 2 : 1))
+                .shadow(color: Color(hex: "#5794E4").opacity(0.8), radius: selected ? 6 : 3)
+        }
+        .animation(.spring(response: 0.3), value: selected)
+        .contentShape(Circle())
     }
 }
 

@@ -19,6 +19,13 @@ W_TASTE = 0.4         # deck_rank 취향 일치 가중
 
 _GET_TASTE_SQL = text("SELECT taste_score FROM user_taste WHERE user_id = :uid;")
 _LABEL_SQL = text("SELECT label FROM tour_spots WHERE content_id = :tour_id;")
+# 라이크 시 '저장(찜)' 목록에 추가(중복 무시).
+_SAVE_SQL = text(
+    """
+    INSERT INTO saved_spots (user_id, content_id) VALUES (:uid, :tour_id)
+    ON CONFLICT (user_id, content_id) DO NOTHING;
+    """
+)
 
 # 현재 taste_score 를 Python 에서 계산해 통째로 덮어쓴다(EWMA 는 호출부에서 산출).
 _UPSERT_TASTE_SQL = text(
@@ -123,6 +130,8 @@ async def apply_swipe(
             "pass_inc": 1 if action == "pass" else 0,
         },
     )
+    if action == "like":   # 라이크 → 저장(찜) 목록에 추가
+        await session.execute(_SAVE_SQL, {"uid": str(user_id), "tour_id": tour_id})
     await session.commit()
     return {"taste_score": new_score, "learned": True, "spot_label": label}
 
