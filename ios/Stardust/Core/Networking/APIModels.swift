@@ -66,7 +66,10 @@ struct TourSpot: Decodable, Identifiable, Hashable {
 
     var imageURL: URL? {
         guard let s = imageUrl, !s.isEmpty else { return nil }
-        return URL(string: s)
+        // KTO 대표사진은 http:// 로 내려오는데 iOS ATS 가 평문 HTTP 로드를 차단한다.
+        // visitkorea 호스트는 https 를 지원하므로 스킴을 승격해 차단을 피한다.
+        let secure = s.hasPrefix("http://") ? "https://" + s.dropFirst("http://".count) : s
+        return URL(string: secure)
     }
     /// "320m" / "1.2km" 표기. 거리 정보가 없으면 nil.
     var distanceText: String? {

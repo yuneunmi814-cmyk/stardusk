@@ -137,6 +137,13 @@ def _region_from_addr(addr: str | None) -> str | None:
     return " ".join(parts[:2]) if parts else None
 
 
+def _https(url: str | None) -> str | None:
+    """KTO 대표사진은 http:// 로 내려온다. iOS ATS 차단을 피하려고 https 로 승격한다."""
+    if not url:
+        return None
+    return "https://" + url[len("http://"):] if url.startswith("http://") else url
+
+
 def _normalize(item: dict) -> dict | None:
     """관광공사 item → tour_spots 컬럼 dict. 좌표 없는 항목은 제외(None)."""
     try:
@@ -168,7 +175,7 @@ def _normalize(item: dict) -> dict | None:
         "cat2": item.get("cat2") or None,
         "cat3": item.get("cat3") or None,
         "tel": (item.get("tel") or "").strip() or None,
-        "image_url": item.get("firstimage") or None,
+        "image_url": _https(item.get("firstimage")),
         "readcount": readcount,
         "longitude": lng,
         "latitude": lat,
