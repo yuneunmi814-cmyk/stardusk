@@ -1,17 +1,10 @@
 import SwiftUI
 import GoogleSignIn
-import KakaoSDKCommon
-import KakaoSDKAuth
 
 @main
 struct StardustApp: App {
     @StateObject private var session = SessionStore()      // 토큰은 Keychain 에 보관
     @StateObject private var appLocation = AppLocation()   // 탐색 기준 위치(하이브리드)
-
-    init() {
-        // 카카오 SDK 초기화(네이티브 앱 키 — 클라이언트 내장 식별자)
-        KakaoSDK.initSDK(appKey: "c5b7d136888b761bd4218b2414a04f37")
-    }
 
     var body: some Scene {
         WindowGroup {
@@ -22,16 +15,9 @@ struct StardustApp: App {
                     // Keychain 에 저장돼 있던 토큰을 API 액터에 주입(자동 로그인)
                     await session.bootstrap()
                 }
-                // 소셜 로그인 리디렉트 콜백(카카오톡 앱 ↔ Google). GIDClientID 는
-                // Info.plist 에서 자동 로드.
+                // Google 로그인 리디렉트 콜백(GIDClientID 는 Info.plist 에서 자동 로드)
                 .onOpenURL { url in
-                    if AuthApi.isKakaoTalkLoginUrl(url) {
-                        _ = AuthController.handleOpenUrl(url: url)
-                    } else if url.scheme == "stardust" {
-                        NaverLoginManager.shared.handleURL(url)   // 네이버 콜백
-                    } else {
-                        GIDSignIn.sharedInstance.handle(url)      // Google 콜백
-                    }
+                    GIDSignIn.sharedInstance.handle(url)
                 }
         }
     }

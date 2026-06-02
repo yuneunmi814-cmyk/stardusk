@@ -4,7 +4,4 @@
 //    빌드 시 결과: https://stardust-api-ts8t.onrender.com/api/v1
 // ※ 로컬 백엔드로 개발하려면 이 값을 http:/$()/localhost:8000/api/v1 로 되돌리면 된다.
 
-// 로컬 시크릿(네이버 자격증명 등) — 없어도 빌드되도록 optional include.
-#include? "Secrets.xcconfig"
-
 STARDUST_API_BASE_URL = https:/$()/stardust-api-ts8t.onrender.com/api/v1
