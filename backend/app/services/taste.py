@@ -62,7 +62,7 @@ _DECK_SQL = text(
             ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography,
             :radius
         )
-          AND cat1 = 'A01'  -- 자연(A01)만 — 산·계곡·폭포·해변·숲·호수 등
+          AND (cat1 = 'A01' OR (content_type_id = '12' AND (cat1 IS NULL OR cat1 = '')))  -- 자연(A01) + 분류 공백 관광지(해변 등 cat 누락분 포함)
           AND spot_name !~ '(시청|군청|구청|도청|행정복지센터|주민센터|행정센터|면사무소|읍사무소|동사무소|보건소|보건지소|우체국|경찰서|파출소|지구대|소방서|세무서|등기소|교육청|법원|노인회|부녀회|청년회|번영회|자치회|협회|지회|연합회|복지관|행정역사관)'  -- 관변·행정 시설 제외
     )
     SELECT
