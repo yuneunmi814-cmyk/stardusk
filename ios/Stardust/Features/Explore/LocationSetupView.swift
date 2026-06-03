@@ -16,6 +16,7 @@ struct LocationSetupView: View {
     @State private var centerCoord = AppLocation.gangneung
     @State private var placeName = "현재 위치"
     @State private var didAutoLocate = false
+    @Environment(\.colorScheme) private var scheme
 
     private let geocoder = CLGeocoder()
 
@@ -60,12 +61,12 @@ struct LocationSetupView: View {
             Spacer()
             Image(systemName: "mappin.circle.fill")
                 .font(.system(size: 38))
-                .foregroundStyle(.white, Color(hex: "#5794E4"))
+                .foregroundStyle(.white, Color.meadowDeep)
                 .shadow(radius: 4)
             Image(systemName: "triangle.fill")
                 .font(.system(size: 10))
                 .rotationEffect(.degrees(180))
-                .foregroundStyle(Color(hex: "#5794E4"))
+                .foregroundStyle(Color.meadowDeep)
                 .offset(y: -4)
             Spacer().frame(height: UIScreen.main.bounds.height * 0.5)
         }
@@ -101,9 +102,10 @@ struct LocationSetupView: View {
                     search.clear()
                 } label: {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(item.title).font(.callout.weight(.medium)).foregroundStyle(.primary)
+                        Text(item.title).font(.callout.weight(.medium))
+                            .foregroundStyle(Meadow.textPrimary(scheme))
                         if let sub = item.subtitle {
-                            Text(sub).font(.caption).foregroundStyle(.secondary)
+                            Text(sub).font(.caption).foregroundStyle(Meadow.textSecondary(scheme))
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -123,8 +125,9 @@ struct LocationSetupView: View {
             Spacer()
             VStack(spacing: 12) {
                 HStack(spacing: 8) {
-                    Image(systemName: "mappin.and.ellipse").foregroundStyle(Color(hex: "#5794E4"))
-                    Text(placeName).font(.subheadline.weight(.semibold)).lineLimit(1)
+                    Image(systemName: "mappin.and.ellipse").foregroundStyle(Color.meadowDeep)
+                    Text(placeName).font(.subheadline.weight(.medium)).lineLimit(1)
+                        .foregroundStyle(Meadow.textPrimary(scheme))
                     Spacer()
                 }
                 Button {
@@ -132,14 +135,10 @@ struct LocationSetupView: View {
                     appLocation.confirm()
                 } label: {
                     Text("해당 위치로 시작하기")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity).frame(height: 52)
-                        .background(Color(hex: "#5794E4"), in: RoundedRectangle(cornerRadius: 14))
-                        .foregroundStyle(.white)
-                }
+                } .buttonStyle(.meadowCTA)
             }
             .padding(16)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
+            .background(Meadow.surface(scheme), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
             .padding(.horizontal, 16).padding(.bottom, 12)
         }
     }

@@ -12,6 +12,7 @@ struct ExploreView: View {
     @State private var showSettings = false
     @State private var camera: MapCameraPosition = .automatic
     @State private var centeredAt: CLLocationCoordinate2D?   // 마지막으로 지도를 맞춘 좌표
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         VStack(spacing: 0) {
@@ -42,23 +43,25 @@ struct ExploreView: View {
     // MARK: 헤더
     private var header: some View {
         HStack(spacing: 6) {
-            Image(systemName: "location.fill").font(.footnote).foregroundStyle(Color(hex: "#5794E4"))
-            Text(appLocation.displayName).font(.subheadline.weight(.semibold)).lineLimit(1)
+            Image(systemName: "location.fill").font(.footnote).foregroundStyle(Color.meadowDeep)
+            Text(appLocation.displayName).font(.subheadline.weight(.medium)).lineLimit(1)
+                .foregroundStyle(Meadow.textPrimary(scheme))
             Button { appLocation.reopenSetup() } label: {
-                Text("변경").font(.caption.weight(.semibold))
+                Text("변경").font(.caption.weight(.medium)).foregroundStyle(Color.meadowDeep)
             }
             Spacer()
             Button { showSettings = true } label: {
                 Image(systemName: "line.3.horizontal")
-                    .font(.body.weight(.bold))
-                    .foregroundStyle(.primary)
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(Meadow.textPrimary(scheme))
                     .frame(width: 38, height: 38)
-                    .background(Color(.systemGray5), in: Circle())
+                    .background(Meadow.surface(scheme), in: Circle())
                     .contentShape(Circle())
             }
             .accessibilityLabel("메뉴")
         }
-        .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 6)
+        .padding(.horizontal, 20).padding(.top, 10).padding(.bottom, 10)
+        .background(Meadow.surface(scheme))
         .sheet(isPresented: $showSettings) { SettingsView() }
     }
 
@@ -89,13 +92,13 @@ struct ExploreView: View {
 
             if vm.mapSpots.isEmpty && !vm.isLoading {
                 VStack(spacing: 6) {
-                    Image(systemName: "moon.stars.fill").font(.title2)
-                    Text("이 지역은 아직 준비 중이에요").font(.subheadline.weight(.semibold))
+                    Image(systemName: "leaf.fill").font(.title2).foregroundStyle(Color.meadow)
+                    Text("이 지역은 아직 준비 중이에요").font(.subheadline.weight(.medium))
+                        .foregroundStyle(Meadow.textPrimary(scheme))
                 }
-                .foregroundStyle(.primary)
-                .padding(.vertical, 14).padding(.horizontal, 18)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-                .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
+                .padding(.vertical, 16).padding(.horizontal, 20)
+                .background(Meadow.surface(scheme), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
                 .padding(.bottom, 28)
             }
         }
@@ -113,13 +116,12 @@ struct ExploreView: View {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").font(.headline)
-                Text("내 주변 관광지 탐색").font(.callout.weight(.semibold))
+                Text("내 주변 자연 탐색").font(.callout.weight(.medium))
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(Meadow.onAccent)
             .padding(.horizontal, 24).frame(height: 54)
-            .background(Color(hex: "#5794E4").opacity(0.95), in: Capsule())
-            .overlay(Capsule().stroke(Color.white.opacity(0.35), lineWidth: 1))
-            .shadow(color: Color(hex: "#5794E4").opacity(0.5), radius: 12, y: 4)
+            .background(Color.meadowAccent, in: Capsule())
+            .shadow(color: Color.meadowAccent.opacity(0.45), radius: 12, y: 4)
         }
     }
 
@@ -144,12 +146,12 @@ struct StarDot: View {
     var selected: Bool
     var body: some View {
         ZStack {
-            Circle().fill(Color(hex: "#5794E4").opacity(0.35))
+            Circle().fill(Color.meadowDeep.opacity(0.35))
                 .frame(width: selected ? 26 : 18, height: selected ? 26 : 18).blur(radius: 4)
             Circle().fill(.white)
                 .frame(width: selected ? 12 : 8, height: selected ? 12 : 8)
-                .overlay(Circle().stroke(Color(hex: "#5794E4"), lineWidth: selected ? 2 : 1))
-                .shadow(color: Color(hex: "#5794E4").opacity(0.8), radius: selected ? 6 : 3)
+                .overlay(Circle().stroke(Color.meadowDeep, lineWidth: selected ? 2 : 1))
+                .shadow(color: Color.meadowDeep.opacity(0.8), radius: selected ? 6 : 3)
         }
         .animation(.spring(response: 0.3), value: selected)
         .contentShape(Circle())
@@ -162,12 +164,13 @@ struct SpotCardView: View {
     let spot: TourSpot
     var onClose: () -> Void
     @State private var showHandoff = false
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ZStack(alignment: .topTrailing) {
                 SpotImage(url: spot.imageURL) {
-                    LinearGradient(colors: [Color(hex: "#8FBEF0"), Color(hex: "#CFE5FB")],
+                    LinearGradient(colors: [.meadowHorizon, .meadowSky],
                                    startPoint: .top, endPoint: .bottom)
                 }
                 .frame(height: 140).frame(maxWidth: .infinity).clipped()
@@ -185,25 +188,27 @@ struct SpotCardView: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text(spot.spotName).font(.headline).lineLimit(1)
+                Text(spot.spotName).font(.headline.weight(.medium)).lineLimit(1)
+                    .foregroundStyle(Meadow.textPrimary(scheme))
                 if let addr = spot.address ?? spot.region {
-                    Label(addr, systemImage: "mappin").font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    Label(addr, systemImage: "mappin").font(.caption)
+                        .foregroundStyle(Meadow.textSecondary(scheme)).lineLimit(1)
                 }
                 Button {
                     showHandoff = true
                 } label: {
                     Label("여기로 길안내", systemImage: "location.north.line.fill")
-                        .font(.callout.weight(.semibold))
+                        .font(.callout.weight(.medium))
                         .frame(maxWidth: .infinity).frame(height: 46)
-                        .background(Color(hex: "#5794E4"), in: RoundedRectangle(cornerRadius: 12))
-                        .foregroundStyle(.white)
+                        .background(Color.meadowAccent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .foregroundStyle(Meadow.onAccent)
                 }
                 .padding(.top, 2)
             }
-            .padding(14)
+            .padding(16)
         }
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
-        .shadow(color: .black.opacity(0.18), radius: 12, y: 4)
+        .background(Meadow.surface(scheme), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .shadow(color: .black.opacity(0.10), radius: 12, y: 4)
         .confirmationDialog("길안내 앱 선택", isPresented: $showHandoff, titleVisibility: .visible) {
             ForEach(handoffOptions) { opt in Button(opt.label) { opt.action() } }
             Button("취소", role: .cancel) {}

@@ -4,6 +4,7 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var session: SessionStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var scheme
 
     @AppStorage("marketingOptIn") private var marketingOptIn = false
 
@@ -37,6 +38,7 @@ struct SettingsView: View {
                         Label("회원 탈퇴", systemImage: "trash")
                     }
                 }
+                .listRowBackground(Meadow.surface(scheme))
 
                 // 알림·위치
                 Section("권한") {
@@ -49,7 +51,9 @@ struct SettingsView: View {
                     Toggle(isOn: $marketingOptIn) {
                         Label("마케팅·개인화 푸시 동의", systemImage: "sparkles")
                     }
+                    .tint(Color.meadowDeep)
                 }
+                .listRowBackground(Meadow.surface(scheme))
 
                 // 약관·정책
                 Section("약관 및 정책") {
@@ -60,6 +64,7 @@ struct SettingsView: View {
                         Label("이용약관", systemImage: "doc.text")
                     }
                 }
+                .listRowBackground(Meadow.surface(scheme))
 
                 // 정보
                 Section("정보") {
@@ -72,12 +77,17 @@ struct SettingsView: View {
                         Label("문의하기", systemImage: "envelope")
                     }
                 }
+                .listRowBackground(Meadow.surface(scheme))
 
                 if let errorText {
                     Section { Text(errorText).font(.footnote).foregroundStyle(.red) }
+                        .listRowBackground(Meadow.surface(scheme))
                 }
             }
-            .tint(Color(hex: "#5794E4"))   // 탭바의 흰색 tint 상속 차단(버튼/링크 보이게)
+            .scrollContentBackground(.hidden)
+            .background(MeadowBackground())
+            .tint(Color.meadowDeep)   // 탭바 tint 상속 차단(버튼/링크 보이게) + 초원 악센트
+            .foregroundStyle(Meadow.textPrimary(scheme))
             .navigationTitle("설정")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

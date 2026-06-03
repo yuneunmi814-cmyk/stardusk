@@ -10,20 +10,30 @@ struct SavedView: View {
     @State private var errorText: String?
     @State private var handoff: [ExternalMapOption] = []
     @State private var showHandoff = false
+    @Environment(\.colorScheme) private var scheme
 
     private let api = StardustAPI.shared
 
     var body: some View {
         NavigationStack {
-            Group {
-                if spots.isEmpty && !isLoading {
-                    emptyState
-                } else {
-                    List {
-                        ForEach(spots) { spot in row(spot) }
+            ZStack {
+                MeadowBackground()
+                Group {
+                    if spots.isEmpty && !isLoading {
+                        emptyState
+                    } else {
+                        List {
+                            ForEach(spots) { spot in
+                                row(spot)
+                                    .listRowBackground(Color.clear)
+                                    .listRowSeparator(.hidden)
+                                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                            }
                             .onDelete { idx in Task { await remove(idx) } }
+                        }
+                        .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
                     }
-                    .listStyle(.plain)
                 }
             }
             .navigationTitle("저장한 곳")
@@ -40,29 +50,31 @@ struct SavedView: View {
     }
 
     private func row(_ spot: TourSpot) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 12) {
                 SpotImage(url: spot.imageURL) {
-                    LinearGradient(colors: [Color(hex: "#8FBEF0"), Color(hex: "#CFE5FB")],
+                    LinearGradient(colors: [.meadowHorizon, .meadowSky],
                                    startPoint: .top, endPoint: .bottom)
                 }
-                .frame(width: 70, height: 70).clipShape(RoundedRectangle(cornerRadius: 12))
+                .frame(width: 70, height: 70)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(spot.spotName).font(.headline).lineLimit(1)
+                    Text(spot.spotName).font(.headline.weight(.medium)).lineLimit(1)
+                        .foregroundStyle(Meadow.textPrimary(scheme))
                     if let addr = spot.address ?? spot.region {
-                        Text(addr).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        Text(addr).font(.caption).foregroundStyle(Meadow.textSecondary(scheme)).lineLimit(1)
                     }
                     if let badge = spot.tasteBadge {
                         Label(badge.text, systemImage: badge.symbol)
-                            .font(.caption2.weight(.semibold)).foregroundStyle(Color(hex: "#5794E4"))
+                            .font(.caption2.weight(.medium)).foregroundStyle(Color.meadowDeep)
                     }
                 }
                 Spacer()
                 // 채워진 하트 = 저장됨. 탭하면 바로 저장 해제(탐색에서 다시 라이크하면 복구).
                 Button { Task { await unsave(spot) } } label: {
                     Image(systemName: "heart.fill")
-                        .font(.title3).foregroundStyle(Color(hex: "#5794E4"))
+                        .font(.title3).foregroundStyle(Color.meadowDeep)
                         .padding(8).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -76,26 +88,27 @@ struct SavedView: View {
                 }
             }
         }
-        .padding(.vertical, 6)
+        .meadowCard()
     }
 
     private func chip(_ label: String, _ icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Label(label, systemImage: icon)
-                .font(.subheadline.weight(.semibold))
+                .font(.subheadline.weight(.medium))
                 .frame(maxWidth: .infinity).frame(height: 38)
-                .background(Color(hex: "#5794E4").opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
-                .foregroundStyle(Color(hex: "#5794E4"))
+                .background(Color.meadowDeep.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .foregroundStyle(Color.meadowDeep)
         }
         .buttonStyle(.plain)
     }
 
     private var emptyState: some View {
         VStack(spacing: 12) {
-            Image(systemName: "heart.text.square").font(.system(size: 50)).foregroundStyle(.secondary)
-            Text("저장한 곳이 없어요").font(.headline)
-            Text("탐색에서 마음에 드는 곳을 라이크(♥)하면 여기에 모여요")
-                .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            Image(systemName: "leaf.fill").font(.system(size: 50)).foregroundStyle(Color.meadow)
+            Text("저장한 곳이 없어요").font(.headline.weight(.medium))
+                .foregroundStyle(Meadow.textPrimary(scheme))
+            Text("탐색에서 마음에 드는 자연을 라이크(♥)하면 여기에 모여요")
+                .font(.subheadline).foregroundStyle(Meadow.textSecondary(scheme)).multilineTextAlignment(.center)
         }
         .padding(.horizontal, 32)
     }

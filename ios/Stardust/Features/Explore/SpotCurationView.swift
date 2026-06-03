@@ -18,12 +18,16 @@ struct SpotCurationView: View {
     @State private var handoff: [ExternalMapOption] = []
     @State private var showHandoff = false
     @State private var docentLoadingId: String?
+    @Environment(\.colorScheme) private var scheme
 
     private let threshold: CGFloat = 110
 
     var body: some View {
         ZStack {
-            SkyGradientBackground(mood: .night).ignoresSafeArea()
+            // 깊은 초원 안쪽 — 몰입형 어두운 풀색(흰 텍스트 가독 유지)
+            LinearGradient(colors: [.meadowDeep, .meadowNightBg],
+                           startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 topBar
@@ -88,7 +92,7 @@ struct SpotCurationView: View {
             // Color.clear 가 레이아웃 크기(가로=카드폭, 세로=320)를 고정하고,
             // 이미지는 overlay 로만 채워 scaledToFill 이 카드 폭을 밀어내지 못하게 한다.
             SpotImage(url: spot.imageURL) {
-                LinearGradient(colors: [Color(hex: "#3A4A86"), Color(hex: "#16224D")],
+                LinearGradient(colors: [.meadowHorizon, .meadow],
                                startPoint: .top, endPoint: .bottom)
             }
                 .frame(maxWidth: .infinity)
@@ -105,13 +109,15 @@ struct SpotCurationView: View {
                 }
 
             VStack(alignment: .leading, spacing: 10) {
-                Text(spot.spotName).font(.title2.weight(.bold)).lineLimit(2)
+                Text(spot.spotName).font(.title2.weight(.medium)).lineLimit(2)
+                    .foregroundStyle(Meadow.textPrimary(scheme))
                 if let addr = spot.address ?? spot.region {
                     Label(addr, systemImage: "mappin").font(.subheadline)
-                        .foregroundStyle(.secondary).lineLimit(1)
+                        .foregroundStyle(Meadow.textSecondary(scheme)).lineLimit(1)
                 }
                 if let d = spot.distanceText {
-                    Label(d, systemImage: "figure.walk").font(.subheadline).foregroundStyle(.secondary)
+                    Label(d, systemImage: "figure.walk").font(.subheadline)
+                        .foregroundStyle(Meadow.textSecondary(scheme))
                 }
                 HStack(spacing: 10) {
                     cardChip("길찾기", "location.north.line.fill") { startNavigation(spot) }
@@ -126,9 +132,9 @@ struct SpotCurationView: View {
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
-        .clipShape(RoundedRectangle(cornerRadius: 24))   // 이미지 모서리가 카드 둥근모서리 밖으로 안 나가게
-        .shadow(color: .black.opacity(0.3), radius: 18, y: 8)
+        .background(Meadow.surface(scheme))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))   // 이미지 모서리가 카드 둥근모서리 밖으로 안 나가게
+        .shadow(color: .black.opacity(0.25), radius: 18, y: 8)
     }
 
     private func cardChip(_ label: String, _ icon: String, action: @escaping () -> Void) -> some View {
@@ -137,8 +143,8 @@ struct SpotCurationView: View {
                 .font(.subheadline.weight(.semibold))
                 .padding(.horizontal, 14).frame(height: 42)
                 .frame(maxWidth: .infinity)
-                .background(Color(hex: "#5794E4").opacity(0.16), in: RoundedRectangle(cornerRadius: 12))
-                .foregroundStyle(Color(hex: "#5794E4"))
+                .background(Color.meadowDeep.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .foregroundStyle(Color.meadowDeep)
         }
     }
 
@@ -146,7 +152,7 @@ struct SpotCurationView: View {
     private func actionButtons(_ spot: TourSpot) -> some View {
         HStack(spacing: 40) {
             bigButton("xmark", Color(.systemGray)) { pass(spot) }
-            bigButton("heart.fill", Color(hex: "#5794E4")) { like(spot) }
+            bigButton("heart.fill", Color.meadowAccent) { like(spot) }
         }
         .padding(.top, 14)
     }
@@ -164,8 +170,8 @@ struct SpotCurationView: View {
     private var finishedState: some View {
         VStack(spacing: 16) {
             Image(systemName: "checkmark.seal.fill").font(.system(size: 54))
-                .foregroundStyle(Color(hex: "#5794E4"))
-            Text("주변 별을 모두 둘러봤어요").font(.headline).foregroundStyle(.white)
+                .foregroundStyle(Color.meadowAccent)
+            Text("주변 자연을 모두 둘러봤어요").font(.headline.weight(.medium)).foregroundStyle(.white)
             Button { index = 0; drag = .zero } label: {
                 Label("처음부터 다시", systemImage: "arrow.clockwise")
                     .font(.subheadline.weight(.semibold)).foregroundStyle(.white)
@@ -181,10 +187,10 @@ struct SpotCurationView: View {
     private func decisionStamp(_ d: Decision) -> some View {
         Text(d == .like ? "LIKE" : "PASS")
             .font(.system(size: 30, weight: .heavy))
-            .foregroundStyle(d == .like ? Color(hex: "#5794E4") : Color(.systemGray))
+            .foregroundStyle(d == .like ? Color.meadowAccent : Color(.systemGray))
             .padding(.horizontal, 12).padding(.vertical, 6)
-            .overlay(RoundedRectangle(cornerRadius: 10)
-                .stroke(d == .like ? Color(hex: "#5794E4") : Color(.systemGray), lineWidth: 4))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(d == .like ? Color.meadowAccent : Color(.systemGray), lineWidth: 4))
             .rotationEffect(.degrees(d == .like ? -16 : 16))
             .padding(28)
     }

@@ -42,7 +42,7 @@ struct RootView: View {
                     .tabItem { Label("저장", systemImage: "heart.fill") }
                     .tag(1)
             }
-            .tint(Color(hex: "#5794E4"))
+            .tint(Color.meadowDeep)
             // 사용자가 '변경'을 눌렀을 때만 위치 설정 지도를 띄운다.
             .fullScreenCover(isPresented: Binding(
                 get: { appLocation.isPickingManually },
