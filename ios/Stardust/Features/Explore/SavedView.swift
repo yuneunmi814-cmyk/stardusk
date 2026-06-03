@@ -27,6 +27,7 @@ struct SavedView: View {
                 }
             }
             .navigationTitle("저장한 곳")
+            .toolbar { if !spots.isEmpty { EditButton() } }   // 여러 개 한 번에 삭제
             .overlay { if isLoading { ProgressView() } }
             .refreshable { await load() }
             .task { await load() }
@@ -41,9 +42,7 @@ struct SavedView: View {
     private func row(_ spot: TourSpot) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
-                AsyncImage(url: spot.imageURL) { img in
-                    img.resizable().scaledToFill()
-                } placeholder: {
+                SpotImage(url: spot.imageURL) {
                     LinearGradient(colors: [Color(hex: "#8FBEF0"), Color(hex: "#CFE5FB")],
                                    startPoint: .top, endPoint: .bottom)
                 }
@@ -60,6 +59,14 @@ struct SavedView: View {
                     }
                 }
                 Spacer()
+                // 채워진 하트 = 저장됨. 탭하면 바로 저장 해제(탐색에서 다시 라이크하면 복구).
+                Button { Task { await unsave(spot) } } label: {
+                    Image(systemName: "heart.fill")
+                        .font(.title3).foregroundStyle(Color(hex: "#5794E4"))
+                        .padding(8).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("저장 해제")
             }
             HStack(spacing: 10) {
                 chip("길찾기", "location.north.line.fill") { startNavigation(spot) }
@@ -99,10 +106,17 @@ struct SavedView: View {
         catch { errorText = "저장 목록을 불러오지 못했어요." }
     }
 
+    /// 스와이프/편집 모드 삭제 — 여러 항목 동시 삭제 지원.
     private func remove(_ offsets: IndexSet) async {
-        guard let i = offsets.first, i < spots.count else { return }
-        let spot = spots[i]
-        do { spots = try await api.unsaveSpot(tourId: spot.tourId) }
+        let targets = offsets.map { spots[$0] }
+        for spot in targets { try? await api.unsaveSpot(tourId: spot.tourId) }
+        do { let updated = try await api.fetchSavedSpots(); withAnimation { spots = updated } }
+        catch { errorText = "삭제에 실패했어요." }
+    }
+
+    /// 하트 버튼 탭 — 단일 항목 즉시 저장 해제.
+    private func unsave(_ spot: TourSpot) async {
+        do { let updated = try await api.unsaveSpot(tourId: spot.tourId); withAnimation { spots = updated } }
         catch { errorText = "삭제에 실패했어요." }
     }
 

@@ -6,6 +6,7 @@ actor StardustAPI {
     private let baseURL: URL
     private let session: URLSession
     private var accessToken: String?      // 로그인 후 주입
+    private var reauth: (() async -> Bool)?   // 401(만료) 시 토큰 복구 핸들러(게스트 재발급 등)
 
     init(baseURL: URL) {
         self.baseURL = baseURL
@@ -17,6 +18,7 @@ actor StardustAPI {
     }
 
     func setToken(_ token: String?) { self.accessToken = token }
+    func setReauthHandler(_ handler: @escaping () async -> Bool) { self.reauth = handler }
 
     private static let decoder: JSONDecoder = {
         let d = JSONDecoder()
@@ -26,7 +28,7 @@ actor StardustAPI {
     }()
 
     // MARK: 공통 실행기
-    private func run<T: Decodable>(_ request: URLRequest, as type: T.Type) async throws -> T {
+    private func run<T: Decodable>(_ request: URLRequest, as type: T.Type, isRetry: Bool = false) async throws -> T {
         var req = request
         if let token = accessToken {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -38,7 +40,13 @@ actor StardustAPI {
         guard let http = resp as? HTTPURLResponse else { throw StardustError.decoding(URLError(.badServerResponse)) }
 
         guard (200..<300).contains(http.statusCode) else {
-            if http.statusCode == 401 { throw StardustError.unauthorized }
+            if http.statusCode == 401 {
+                // 토큰 만료 → 1회 자동 복구(게스트 재발급 등) 후 새 토큰으로 원요청 재시도.
+                if !isRetry, let reauth, await reauth() {
+                    return try await run(request, as: type, isRetry: true)
+                }
+                throw StardustError.unauthorized
+            }
             // 서버 에러 봉투 파싱
             if let body = try? Self.decoder.decode(APIErrorBody.self, from: data) {
                 throw StardustError.server(code: body.detail.code,

@@ -87,17 +87,12 @@ struct SpotCurationView: View {
         VStack(alignment: .leading, spacing: 0) {
             // Color.clear 가 레이아웃 크기(가로=카드폭, 세로=320)를 고정하고,
             // 이미지는 overlay 로만 채워 scaledToFill 이 카드 폭을 밀어내지 못하게 한다.
-            Color.clear
+            SpotImage(url: spot.imageURL) {
+                LinearGradient(colors: [Color(hex: "#3A4A86"), Color(hex: "#16224D")],
+                               startPoint: .top, endPoint: .bottom)
+            }
                 .frame(maxWidth: .infinity)
                 .frame(height: 320)
-                .overlay {
-                    AsyncImage(url: spot.imageURL) { img in
-                        img.resizable().scaledToFill()
-                    } placeholder: {
-                        LinearGradient(colors: [Color(hex: "#3A4A86"), Color(hex: "#16224D")],
-                                       startPoint: .top, endPoint: .bottom)
-                    }
-                }
                 .clipped()
                 .overlay(alignment: .topLeading) {
                     if let badge = spot.tasteBadge {

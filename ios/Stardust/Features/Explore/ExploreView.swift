@@ -11,8 +11,6 @@ struct ExploreView: View {
     @State private var showCuration = false
     @State private var showSettings = false
     @State private var camera: MapCameraPosition = .automatic
-    @AppStorage("didPrimeLocation") private var didPrime = false
-    @State private var showPriming = false
     @State private var centeredAt: CLLocationCoordinate2D?   // 마지막으로 지도를 맞춘 좌표
 
     var body: some View {
@@ -20,11 +18,8 @@ struct ExploreView: View {
             header
             mapArea
         }
-        // 권한 안내(priming)를 한 번 보여준 뒤에 위치를 요청한다.
-        .task {
-            if didPrime { appLocation.autoLocate() } else { showPriming = true }
-        }
-        .overlay { if showPriming { primingCard } }
+        // 진입 시 위치 요청 — iOS 시스템 권한 팝업을 한 번만 띄운다(별도 안내 카드 없음).
+        .task { appLocation.autoLocate() }
         // 좌표가 갱신될 때마다 주변 명소 재로딩 + (큰 이동일 때만) 지도 재중심.
         .task(id: "\(appLocation.coordinate.latitude),\(appLocation.coordinate.longitude)") {
             recenterIfNeeded()
@@ -142,34 +137,6 @@ struct ExploreView: View {
             center: c,
             span: MKCoordinateSpan(latitudeDelta: 0.06, longitudeDelta: 0.06)))
     }
-
-    // 위치 권한 안내(priming) — iOS 시스템 팝업 전에 맥락을 먼저 설명.
-    private var primingCard: some View {
-        ZStack {
-            Color.black.opacity(0.35).ignoresSafeArea()
-            VStack(spacing: 14) {
-                Image(systemName: "location.circle.fill")
-                    .font(.system(size: 44)).foregroundStyle(Color(hex: "#5794E4"))
-                Text("내 주변 관광지를 찾을게요").font(.headline)
-                Text("현재 위치를 기준으로 가까운 명소를 보여드려요.\n위치 권한을 허용해 주세요.")
-                    .font(.subheadline).foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                Button {
-                    didPrime = true
-                    showPriming = false
-                    appLocation.autoLocate()       // 이제 iOS 권한 팝업
-                } label: {
-                    Text("허용하고 시작").font(.headline)
-                        .frame(maxWidth: .infinity).frame(height: 50)
-                        .background(Color(hex: "#5794E4"), in: RoundedRectangle(cornerRadius: 14))
-                        .foregroundStyle(.white)
-                }
-            }
-            .padding(22)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22))
-            .padding(.horizontal, 36)
-        }
-    }
 }
 
 /// 지도 마커 — HTML 별처럼 작은 빛나는 점. 선택 시 커진다.
@@ -199,9 +166,7 @@ struct SpotCardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ZStack(alignment: .topTrailing) {
-                AsyncImage(url: spot.imageURL) { img in
-                    img.resizable().scaledToFill()
-                } placeholder: {
+                SpotImage(url: spot.imageURL) {
                     LinearGradient(colors: [Color(hex: "#8FBEF0"), Color(hex: "#CFE5FB")],
                                    startPoint: .top, endPoint: .bottom)
                 }
