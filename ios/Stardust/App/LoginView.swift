@@ -12,36 +12,31 @@ struct LoginView: View {
 
     var body: some View {
         ZStack {
-            SkyGradientBackground(mood: .dawn)   // HTML 로그인과 동일한 새벽 하늘
-                .ignoresSafeArea()
+            MeadowBackground()                  // 광활한 초원: 하늘 → 초원 → 깊은 풀색
 
             VStack(spacing: 28) {
                 Spacer()
 
                 VStack(spacing: 14) {
-                    // HTML .orb — 천천히 호흡하는 빛무리(해)
+                    // 초원 위로 천천히 호흡하는 햇무리(해)
                     Circle()
                         .fill(RadialGradient(
-                            colors: [.white,
-                                     Color(hex: "#CDB4F0"),
-                                     Color(hex: "#A6C8F0"),
-                                     Color(hex: "#F6C5D8"),
-                                     Color(hex: "#FBD9BF")],
+                            colors: [.white, .meadowAccent, .meadowHorizon, .meadow],
                             center: UnitPoint(x: 0.36, y: 0.30),
                             startRadius: 2, endRadius: 60))
                         .frame(width: 96, height: 96)
-                        .shadow(color: Color(hex: "#F6C5D8").opacity(0.55), radius: 26)
+                        .shadow(color: Color.meadowAccent.opacity(0.45), radius: 26)
                         .scaleEffect(breathe ? 1.06 : 1.0)
                         .animation(.easeInOut(duration: 3.2).repeatForever(autoreverses: true),
                                    value: breathe)
 
                     Text("STARDUST")
-                        .font(.largeTitle.bold())
+                        .font(.largeTitle.weight(.medium))
                         .foregroundStyle(.white)
                         .tracking(4)
-                    Text("당신이 머문 자리마다\n별이 뜹니다")
+                    Text("자연이 머문 자리마다\n쉼표가 찍힙니다")
                         .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.85))
+                        .foregroundStyle(.white.opacity(0.9))
                         .multilineTextAlignment(.center)
                         .lineSpacing(3)
                 }
