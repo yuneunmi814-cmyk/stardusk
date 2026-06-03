@@ -36,7 +36,7 @@ final class ExploreViewModel: ObservableObject {
         isLoading = true; defer { isLoading = false }
         do {
             mapSpots = try await api.fetchNearbySpots(
-                lat: center.latitude, lng: center.longitude, radius: 5000, limit: 100)
+                lat: center.latitude, lng: center.longitude, radius: 15000, limit: 100)
             errorText = nil
         } catch let e as StardustError {
             errorText = e.errorDescription
@@ -51,7 +51,7 @@ final class ExploreViewModel: ObservableObject {
     func loadDeck(center: CLLocationCoordinate2D) async {
         do {
             deckSpots = try await api.fetchDeck(
-                lat: center.latitude, lng: center.longitude, radius: 5000, limit: 20)
+                lat: center.latitude, lng: center.longitude, radius: 15000, limit: 20)
             errorText = nil
         } catch let e as StardustError {
             errorText = e.errorDescription
