@@ -301,6 +301,44 @@ async def run_all_areas(num_of_rows: int = 100, max_pages: int | None = None) ->
     return grand_total
 
 
+async def run_full_sync(num_of_rows: int = 100, max_pages: int | None = None,
+                        relabel: bool = True) -> int:
+    """areaCode **미지정**으로 KTO 전체 카탈로그를 페이지네이션 수집.
+
+    지역코드 기반(areaBasedList2 + areaCode)은 areacode 가 비어 있는 레코드
+    (예: 안목해변 — 좌표는 있으나 areacode/cat 공백)를 반환하지 못한다.
+    areaCode 없이 호출하면 전체(약 5만 건)가 잡혀 그 사각지대를 메운다.
+    UPSERT(content_id) 라 기존 데이터와 중복 없이 보강된다.
+    """
+    total_saved = 0
+    page = 1
+    async with httpx.AsyncClient() as client:
+        while True:
+            body = await _call(
+                client,
+                "areaBasedList2",
+                {"numOfRows": num_of_rows, "pageNo": page, "arrange": "C"},  # areaCode 없음
+            )
+            items = _items(body)
+            if not items:
+                break
+            rows = [r for r in (_normalize(i) for i in items) if r]
+            total_saved += await _upsert(rows)
+            total_count = int(body.get("totalCount", 0))
+            logger.info("full page=%s fetched=%s (누적 %s / 전체 %s)",
+                        page, len(items), total_saved, total_count)
+            if page * num_of_rows >= total_count:
+                break
+            if max_pages and page >= max_pages:
+                break
+            page += 1
+
+    logger.info("✅ 전체 카탈로그 동기화 완료: %s건 UPSERT", total_saved)
+    if relabel:
+        await recompute_labels()
+    return total_saved
+
+
 async def fetch_location_based(latitude: float, longitude: float, radius: int = 1000,
                                num_of_rows: int = 50) -> int:
     """위치기반 관광정보(locationBasedList2). 캐시 미스 시 on-demand 보강용."""
@@ -325,6 +363,8 @@ def _main() -> None:
     parser = argparse.ArgumentParser(description="STARDUST 관광 데이터 동기화")
     parser.add_argument("--area", default=None, help="areaCode (기본: 강원 32)")
     parser.add_argument("--all", action="store_true", help="전국 17개 지역 전량 동기화")
+    parser.add_argument("--full", action="store_true",
+                        help="areaCode 미지정 전체 카탈로그 수집(areacode 공백 명소까지)")
     parser.add_argument("--rows", type=int, default=100, help="페이지당 건수")
     parser.add_argument("--pages", type=int, default=None, help="최대 페이지(테스트용)")
     args = parser.parse_args()
@@ -332,7 +372,9 @@ def _main() -> None:
     if not settings.KTO_SERVICE_KEY:
         raise SystemExit("KTO_SERVICE_KEY 가 비어 있습니다. backend/.env 를 확인하세요.")
 
-    if args.all:
+    if args.full:
+        asyncio.run(run_full_sync(args.rows, args.pages))
+    elif args.all:
         asyncio.run(run_all_areas(args.rows, args.pages))
     else:
         asyncio.run(run_area_sync(args.area, args.rows, args.pages))
