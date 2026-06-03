@@ -58,7 +58,7 @@ _NEARBY_SQL = text(
         ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography,
         :radius
     )
-      AND content_type_id IN ('12','14','25','28')  -- 관광지·문화시설·여행코스·레포츠 (숙박/쇼핑/음식점/축제 제외)
+      AND cat1 = 'A01'  -- 자연(A01)만 — 산·계곡·폭포·해변·숲·호수 등 (인문/레포츠/쇼핑/음식/숙박/추천코스 제외)
       AND spot_name !~ '""" + _CIVIC_NAME_RX + """'      -- 시청·노인회 등 관변/행정 시설 이름 제외
     ORDER BY distance_meters ASC
     LIMIT :limit;
@@ -212,7 +212,7 @@ async def search_spots(
 
     # 관광지·문화시설·축제·여행코스·레포츠만 (숙박/쇼핑/음식점 제외) + 관변·행정 시설 이름 제외
     where: list[str] = [
-        "content_type_id IN ('12','14','25','28')",
+        "cat1 = 'A01'",  # 자연(A01)만
         f"spot_name !~ '{_CIVIC_NAME_RX}'",
     ]
     params: dict = {"limit": limit, "offset": offset}
