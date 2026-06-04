@@ -1,0 +1,7 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Compose 가 실제 테마를 그리므로, 액티비티는 액션바 없는 Material3 베이스만 사용 -->
+    <style name="Theme.Comma" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>
