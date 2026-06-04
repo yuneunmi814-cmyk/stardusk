@@ -115,8 +115,8 @@ struct ExploreView: View {
             Task { await vm.loadDeck(center: appLocation.coordinate) }
         } label: {
             HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass").font(.headline)
-                Text("내 주변 자연 탐색").font(.callout.weight(.medium))
+                Image(systemName: "leaf").font(.headline)
+                Text("지금, 가까운 쉼표로").font(.callout.weight(.medium))
             }
             .foregroundStyle(Meadow.onAccent)
             .padding(.horizontal, 24).frame(height: 54)
