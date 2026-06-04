@@ -88,4 +88,7 @@ interface CommaApi {
 
     @GET("tour/{id}/detail")
     suspend fun detail(@Path("id") id: String): Envelope<SpotDetail>
+
+    @DELETE("auth/me")
+    suspend fun deleteAccount(): retrofit2.Response<Unit>
 }
