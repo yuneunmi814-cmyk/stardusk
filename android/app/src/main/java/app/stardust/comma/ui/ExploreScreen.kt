@@ -3,6 +3,9 @@ package app.stardust.comma.ui
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas as AndroidCanvas
+import android.graphics.Paint
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -19,12 +22,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.geometry.Offset
 import androidx.core.content.ContextCompat
 import app.stardust.comma.data.Session
 import app.stardust.comma.data.TourSpot
 import kotlinx.coroutines.launch
 import app.stardust.comma.ui.theme.MeadowAccent
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.maps.MapsInitializer
+import com.google.android.gms.maps.model.BitmapDescriptor
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.GoogleMap
@@ -35,6 +42,31 @@ import com.google.maps.android.compose.rememberCameraPositionState
 
 private val GANGNEUNG = LatLng(37.7519, 128.8761)
 private fun inKorea(p: LatLng) = p.latitude in 33.0..39.5 && p.longitude in 124.0..132.0
+
+/** iOS StarDot과 동일한 초원 점 마커: 은은한 헤일로 + 흰 점 + meadowDeep 링. */
+private fun meadowDotIcon(density: Float): BitmapDescriptor {
+    val deep = android.graphics.Color.parseColor("#5A9E5E")
+    val size = (20f * density).toInt().coerceAtLeast(28)   // px
+    val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    val canvas = AndroidCanvas(bmp)
+    val c = size / 2f
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    // 1) 헤일로
+    paint.style = Paint.Style.FILL
+    paint.color = deep
+    paint.alpha = 80
+    canvas.drawCircle(c, c, size * 0.46f, paint)
+    // 2) 흰 점
+    paint.alpha = 255
+    paint.color = android.graphics.Color.WHITE
+    canvas.drawCircle(c, c, size * 0.30f, paint)
+    // 3) meadowDeep 링
+    paint.style = Paint.Style.STROKE
+    paint.strokeWidth = density * 1.5f
+    paint.color = deep
+    canvas.drawCircle(c, c, size * 0.30f, paint)
+    return BitmapDescriptorFactory.fromBitmap(bmp)
+}
 
 @SuppressLint("MissingPermission")
 @Composable
@@ -50,6 +82,12 @@ fun ExploreScreen(modifier: Modifier = Modifier) {
     val cam = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(GANGNEUNG, 11f) }
 
     val fused = remember { LocationServices.getFusedLocationProviderClient(ctx) }
+    // BitmapDescriptorFactory는 Maps 초기화 후에만 사용 가능 → 먼저 초기화.
+    val dotIcon = remember {
+        @Suppress("DEPRECATION")
+        MapsInitializer.initialize(ctx)
+        meadowDotIcon(ctx.resources.displayMetrics.density)
+    }
 
     fun applyLocation() {
         val granted = ContextCompat.checkSelfPermission(ctx, Manifest.permission.ACCESS_FINE_LOCATION) ==
@@ -103,6 +141,8 @@ fun ExploreScreen(modifier: Modifier = Modifier) {
                     state = MarkerState(LatLng(s.latitude, s.longitude)),
                     title = s.spotName,
                     snippet = s.address ?: s.region,
+                    icon = dotIcon,                  // iOS와 동일한 초원 점 스타일
+                    anchor = Offset(0.5f, 0.5f),     // 좌표 정중앙에 점이 오도록
                 )
             }
         }
