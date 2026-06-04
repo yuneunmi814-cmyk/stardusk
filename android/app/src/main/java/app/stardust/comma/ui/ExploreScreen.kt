@@ -40,6 +40,7 @@ fun ExploreScreen(modifier: Modifier = Modifier) {
     var center by remember { mutableStateOf(GANGNEUNG) }
     var spots by remember { mutableStateOf<List<TourSpot>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
+    var reload by remember { mutableIntStateOf(0) }   // 버튼으로 강제 재검색 트리거
     val cam = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(GANGNEUNG, 11f) }
 
     val fused = remember { LocationServices.getFusedLocationProviderClient(ctx) }
@@ -71,8 +72,8 @@ fun ExploreScreen(modifier: Modifier = Modifier) {
         ))
     }
 
-    // center 변경 시 카메라 이동 + 주변 자연 명소 로드
-    LaunchedEffect(center) {
+    // center 변경 또는 reload 증가 시: 카메라 이동 + 주변 자연 명소 로드
+    LaunchedEffect(center, reload) {
         cam.position = CameraPosition.fromLatLngZoom(center, 11f)
         loading = true
         spots = try {
@@ -118,7 +119,7 @@ fun ExploreScreen(modifier: Modifier = Modifier) {
 
         // CTA — 다시 가까운 자연 불러오기(추후 큐레이션 카드로 확장)
         Button(
-            onClick = { center = LatLng(center.latitude, center.longitude) /* trigger reload */ },
+            onClick = { applyLocation(); reload++ },   // 내 위치 재취득 + 강제 재검색
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 20.dp).height(54.dp),
             shape = RoundedCornerShape(27.dp),
             colors = ButtonDefaults.buttonColors(containerColor = MeadowAccent, contentColor = Color.White),
