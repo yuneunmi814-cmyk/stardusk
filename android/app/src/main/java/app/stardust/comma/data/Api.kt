@@ -43,6 +43,13 @@ data class TourSpot(
 }
 
 @JsonClass(generateAdapter = true)
+data class LoginBody(
+    val provider: String,
+    @Json(name = "identity_token") val identityToken: String,
+    val nickname: String? = null,
+)
+
+@JsonClass(generateAdapter = true)
 data class SwipeBody(@Json(name = "tour_id") val tourId: String, val action: String)
 
 @JsonClass(generateAdapter = true)
@@ -60,6 +67,9 @@ data class SpotDetail(
 interface CommaApi {
     @POST("auth/guest")
     suspend fun guest(): Envelope<AuthData>
+
+    @POST("auth/login")
+    suspend fun login(@Body body: LoginBody): Envelope<AuthData>
 
     @GET("tour/spots")
     suspend fun nearby(

@@ -85,6 +85,12 @@ object Session {
         setToken(auth.accessToken, auth.nickname)
     }
 
+    /** Google ID 토큰으로 서버 로그인(provider=google). */
+    suspend fun loginGoogle(idToken: String) {
+        val auth = api.login(LoginBody(provider = "google", identityToken = idToken)).data
+        setToken(auth.accessToken, auth.nickname)
+    }
+
     suspend fun deleteAccount() {
         runCatching { api.deleteAccount() }   // 성공/실패 무관하게 로컬 세션은 비운다
         logout()

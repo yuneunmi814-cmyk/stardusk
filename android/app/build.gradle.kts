@@ -11,6 +11,7 @@ val localProps = Properties().apply {
     if (f.exists()) f.inputStream().use { load(it) }
 }
 val mapsApiKey: String = (localProps.getProperty("MAPS_API_KEY") ?: "")
+val googleWebClientId: String = (localProps.getProperty("GOOGLE_WEB_CLIENT_ID") ?: "")
 
 android {
     namespace = "app.stardust.comma"
@@ -23,6 +24,7 @@ android {
         versionCode = 1
         versionName = "1.0"
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
     }
 
     buildTypes {
@@ -36,7 +38,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.14" }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
 }
@@ -70,4 +72,9 @@ dependencies {
 
     // 이미지
     implementation("io.coil-kt:coil-compose:2.6.0")
+
+    // Google 로그인 (Credential Manager)
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 }

@@ -12,13 +12,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import app.stardust.comma.BuildConfig
 import app.stardust.comma.data.Session
+import app.stardust.comma.data.googleIdToken
 import app.stardust.comma.ui.theme.MeadowAccent
+import app.stardust.comma.ui.theme.MeadowDeep
 import app.stardust.comma.ui.theme.meadowBackgroundBrush
 import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(onEnter: () -> Unit) {
+    val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var working by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -56,6 +61,27 @@ fun LoginScreen(onEnter: () -> Unit) {
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = MeadowAccent, contentColor = Color.White),
             ) { Text(if (working) "들어가는 중…" else "둘러보기 (게스트)", fontWeight = FontWeight.Medium) }
+
+            Spacer(Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = {
+                    if (working) return@OutlinedButton
+                    working = true; error = null
+                    scope.launch {
+                        try {
+                            val idToken = googleIdToken(ctx, BuildConfig.GOOGLE_WEB_CLIENT_ID)
+                            Session.loginGoogle(idToken); onEnter()
+                        } catch (e: Exception) {
+                            error = if (BuildConfig.GOOGLE_WEB_CLIENT_ID.isBlank())
+                                "Google 로그인은 설정 후 사용할 수 있어요(웹 클라이언트 ID 필요)."
+                            else "Google 로그인에 실패했어요."
+                        } finally { working = false }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+            ) { Text("Google로 계속하기", fontWeight = FontWeight.Medium) }
 
             error?.let {
                 Spacer(Modifier.height(12.dp))
