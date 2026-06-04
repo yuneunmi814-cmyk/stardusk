@@ -1,4 +1,4 @@
-# STARDUST · iOS 출시 가이드 (Archive → App Store 제출)
+# 쉼표 · iOS 출시 가이드 (Archive → App Store 제출)
 
 Xcode에서 빌드를 아카이브해 App Store Connect에 업로드하고 심사 제출하기까지의 전 과정.
 메타데이터 텍스트는 [`APP_STORE_METADATA.md`](./APP_STORE_METADATA.md) 참고.
@@ -45,7 +45,7 @@ Xcode 상단 스킴 옆 기기 선택을 **`Any iOS Device (arm64)`** 로 변경
 
 ## 4. App Store Connect — 버전 정보 입력
 
-**My Apps → STARDUST → (iOS 앱) → 1.0 버전 준비** 화면에서:
+**My Apps → 쉼표 → (iOS 앱) → 1.0 버전 준비** 화면에서:
 
 - **스크린샷**(아래 5번) 업로드
 - **프로모션 텍스트 / 설명 / 키워드 / 지원 URL / 마케팅 URL** → `APP_STORE_METADATA.md` 복붙
