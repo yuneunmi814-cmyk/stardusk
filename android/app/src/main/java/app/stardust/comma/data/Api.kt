@@ -51,6 +51,12 @@ data class SwipeData(
     val learned: Boolean,
 )
 
+@JsonClass(generateAdapter = true)
+data class SpotDetail(
+    @Json(name = "content_id") val contentId: String,
+    val overview: String?,
+)
+
 interface CommaApi {
     @POST("auth/guest")
     suspend fun guest(): Envelope<AuthData>
@@ -79,4 +85,7 @@ interface CommaApi {
 
     @POST("tour/swipe")
     suspend fun swipe(@Body body: SwipeBody): Envelope<SwipeData>
+
+    @GET("tour/{id}/detail")
+    suspend fun detail(@Path("id") id: String): Envelope<SpotDetail>
 }

@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import app.stardust.comma.data.Session
 import app.stardust.comma.data.TourSpot
+import kotlinx.coroutines.launch
 import app.stardust.comma.ui.theme.MeadowAccent
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.model.CameraPosition
@@ -41,6 +42,9 @@ fun ExploreScreen(modifier: Modifier = Modifier) {
     var spots by remember { mutableStateOf<List<TourSpot>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
     var reload by remember { mutableIntStateOf(0) }   // 버튼으로 강제 재검색 트리거
+    val scope = rememberCoroutineScope()
+    var showCuration by remember { mutableStateOf(false) }
+    var deck by remember { mutableStateOf<List<TourSpot>>(emptyList()) }
     val cam = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(GANGNEUNG, 11f) }
 
     val fused = remember { LocationServices.getFusedLocationProviderClient(ctx) }
@@ -119,7 +123,14 @@ fun ExploreScreen(modifier: Modifier = Modifier) {
 
         // CTA — 다시 가까운 자연 불러오기(추후 큐레이션 카드로 확장)
         Button(
-            onClick = { applyLocation(); reload++ },   // 내 위치 재취득 + 강제 재검색
+            onClick = {
+                scope.launch {
+                    Session.ensureGuest()
+                    val d = runCatching { Session.api.deck(center.latitude, center.longitude).data }.getOrDefault(emptyList())
+                    deck = d.ifEmpty { spots }
+                    if (deck.isNotEmpty()) showCuration = true
+                }
+            },
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 20.dp).height(54.dp),
             shape = RoundedCornerShape(27.dp),
             colors = ButtonDefaults.buttonColors(containerColor = MeadowAccent, contentColor = Color.White),
@@ -128,5 +139,10 @@ fun ExploreScreen(modifier: Modifier = Modifier) {
             Spacer(Modifier.width(8.dp))
             Text("지금, 가까운 쉼표로", fontWeight = FontWeight.Medium)
         }
+    }
+
+    // 큐레이션 카드 덱(풀스크린 오버레이)
+    if (showCuration) {
+        CurationOverlay(spots = deck, onClose = { showCuration = false })
     }
 }
