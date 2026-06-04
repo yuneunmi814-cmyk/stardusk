@@ -113,9 +113,9 @@ Play용 자산은 별도 규격이 필요:
 sips -z 512 512 android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png \
      --out android/screenshots/play_icon_512.png
 ```
-- [ ] **512×512 아이콘** 준비
-- [ ] **1024×500 피처 그래픽**: 초원 그라데이션 배경 + "쉼표 / 잠시 멈추어, 숨을 고르다" 워드마크
-      (Figma/Canva 등으로 제작 권장. 필요하면 생성 스크립트를 만들어 드릴 수 있어요.)
+- [x] **512×512 아이콘** → `android/screenshots/play_icon_512.png`
+- [x] **1024×500 피처 그래픽** → `android/screenshots/play_feature_1024x500.png`
+      (초원 그라데이션 + "쉼 표 / 잠시 멈추어, 숨을 고르다". 재생성: `swift /tmp/feature_graphic.swift <out.png>`)
 
 ---
 

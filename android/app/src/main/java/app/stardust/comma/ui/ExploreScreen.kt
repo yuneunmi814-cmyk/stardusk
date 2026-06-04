@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import app.stardust.comma.data.Session
 import app.stardust.comma.data.TourSpot
@@ -141,8 +143,13 @@ fun ExploreScreen(modifier: Modifier = Modifier) {
         }
     }
 
-    // 큐레이션 카드 덱(풀스크린 오버레이)
+    // 큐레이션 카드 덱(진짜 풀스크린 오버레이 — 하단 내비게이션 바까지 덮어 라이크/패스 버튼 노출)
     if (showCuration) {
-        CurationOverlay(spots = deck, onClose = { showCuration = false })
+        Dialog(
+            onDismissRequest = { showCuration = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            CurationOverlay(spots = deck, onClose = { showCuration = false })
+        }
     }
 }
