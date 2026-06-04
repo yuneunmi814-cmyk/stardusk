@@ -53,6 +53,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("com.google.android.material:material:1.12.0")   // XML Theme.Material3.* 제공(액티비티 테마용)
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
     // 지도 · 위치
