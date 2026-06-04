@@ -64,9 +64,11 @@ def _find_key(jwks: dict, kid: str) -> dict | None:
     return None
 
 
-async def _verify_jwt(token: str, *, jwks_url: str, audience: str,
+async def _verify_jwt(token: str, *, jwks_url: str, audience: "str | set[str]",
                       issuers: set[str]) -> dict:
-    """공통 JWT 검증기 — JWKS 로 서명/aud/iss/exp 를 확인하고 클레임을 반환."""
+    """공통 JWT 검증기 — JWKS 로 서명/aud/iss/exp 를 확인하고 클레임을 반환.
+    audience 는 단일 문자열 또는 허용 집합(여러 플랫폼 클라이언트 ID)을 받는다."""
+    allowed = {audience} if isinstance(audience, str) else set(audience)
     if not token:
         raise _auth_error("INVALID_TOKEN", "유효하지 않은 인증 토큰입니다.")
     try:
@@ -86,17 +88,23 @@ async def _verify_jwt(token: str, *, jwks_url: str, audience: str,
         raise _auth_error("INVALID_TOKEN", "토큰 서명 키를 확인할 수 없습니다.")
 
     try:
+        # aud 는 직접 대조(여러 audience 허용)하므로 jose 의 aud 검증은 끈다.
         claims = jwt.decode(
             token,
             key,
             algorithms=[key.get("alg", "RS256")],
-            audience=audience,
-            options={"verify_at_hash": False},
+            options={"verify_at_hash": False, "verify_aud": False},
         )
     except ExpiredSignatureError as e:
         raise _auth_error("AUTH_EXPIRED", "인증 토큰이 만료되었습니다. 다시 로그인해주세요.") from e
     except JWTError as e:
         raise _auth_error("INVALID_TOKEN", "인증 토큰 검증에 실패했습니다.") from e
+
+    # aud 대조: 토큰의 aud(문자열 또는 배열)가 허용 집합과 교집합이 있어야 한다.
+    aud = claims.get("aud")
+    aud_set = {aud} if isinstance(aud, str) else set(aud or [])
+    if aud_set.isdisjoint(allowed):
+        raise _auth_error("INVALID_TOKEN", "토큰 대상(aud)이 허용되지 않습니다.")
 
     if claims.get("iss") not in issuers:
         raise _auth_error("INVALID_TOKEN", "신뢰할 수 없는 토큰 발급자입니다.")
@@ -123,10 +131,12 @@ async def verify_google(identity_token: str) -> dict:
     if not settings.GOOGLE_CLIENT_ID:
         raise _auth_error("AUTH_NOT_CONFIGURED",
                           "Google 로그인이 서버에 설정되어 있지 않습니다.")
+    # GOOGLE_CLIENT_ID 는 쉼표로 여러 개 지정 가능(iOS 클라이언트 + 웹/안드로이드 클라이언트).
+    auds = {a.strip() for a in settings.GOOGLE_CLIENT_ID.split(",") if a.strip()}
     claims = await _verify_jwt(
         identity_token,
         jwks_url=GOOGLE_JWKS_URL,
-        audience=settings.GOOGLE_CLIENT_ID,
+        audience=auds,
         issuers=GOOGLE_ISSUERS,
     )
     return {"subject": claims["sub"], "email": claims.get("email"),
