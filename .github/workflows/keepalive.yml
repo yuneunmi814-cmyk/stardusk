@@ -1,0 +1,24 @@
+name: keep-alive (backend warm)
+
+# Render 무료 플랜은 15분 유휴 시 잠들어 첫 요청이 30~50초 지연된다.
+# 심사·초기 운영 기간 동안 백엔드를 깨워두기 위해 /health 를 주기적으로 핑한다.
+# (GitHub Actions cron 은 무료. 시크릿 불필요 — 공개 health 엔드포인트만 호출)
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # 10분마다 (실제 실행은 부하에 따라 다소 지연될 수 있음)
+  workflow_dispatch: {}        # 수동 실행 버튼
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /health
+        run: |
+          for i in 1 2 3; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" -m 60 https://stardust-api-ts8t.onrender.com/health || echo "000")
+            echo "attempt $i → HTTP $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 20
+          done
+          echo "health check did not return 200 (백엔드가 깨어나는 중일 수 있음)"
