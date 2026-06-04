@@ -53,7 +53,8 @@ fun CurationOverlay(spots: List<TourSpot>, onClose: () -> Unit) {
     }
 
     fun advance(liked: Boolean, spot: TourSpot) {
-        scope.launch { runCatching { Session.api.swipe(app.stardust.comma.data.SwipeBody(spot.tourId, if (liked) "like" else "pass")) } }
+        // 앱 수명 스코프로 보내 오버레이가 닫혀도(예: 마지막 카드 라이크) 저장이 유실되지 않게 한다.
+        Session.recordSwipe(spot.tourId, liked)
         tts.value?.stop()
         dragX = 0f
         index += 1

@@ -2,6 +2,10 @@ package app.stardust.comma.data
 
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import okhttp3.Authenticator
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
@@ -24,6 +28,9 @@ object Session {
 
     @Volatile var accessToken: String? = null; private set
     @Volatile var nickname: String? = null; private set
+
+    /** 화면 수명과 무관하게 살아있는 앱 수명 스코프(라이크→저장 같은 fire-and-forget 호출용). */
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private fun setToken(token: String?, name: String? = nickname) { accessToken = token; nickname = name }
 
@@ -77,6 +84,18 @@ object Session {
         .baseUrl(BASE).client(client)
         .addConverterFactory(MoshiConverterFactory.create(moshi))
         .build().create(CommaApi::class.java)
+
+    /** 스와이프(라이크/패스) 학습+저장을 화면 종료와 무관하게 끝까지 보낸다.
+     *  큐레이션 오버레이가 닫혀도 요청이 취소되지 않도록 앱 수명 스코프에서 실행. */
+    fun recordSwipe(tourId: String, like: Boolean) {
+        if (tourId.isBlank()) return
+        appScope.launch {
+            runCatching {
+                ensureGuest()
+                api.swipe(SwipeBody(tourId, if (like) "like" else "pass"))
+            }
+        }
+    }
 
     suspend fun ensureGuest() { if (accessToken == null) guestLogin() }
 
