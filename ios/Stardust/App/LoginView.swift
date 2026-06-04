@@ -30,11 +30,11 @@ struct LoginView: View {
                         .animation(.easeInOut(duration: 3.2).repeatForever(autoreverses: true),
                                    value: breathe)
 
-                    Text("STARDUST")
+                    Text("쉼표")
                         .font(.largeTitle.weight(.medium))
                         .foregroundStyle(.white)
-                        .tracking(4)
-                    Text("자연이 머문 자리마다\n쉼표가 찍힙니다")
+                        .tracking(8)
+                    Text("잠시 멈추어,\n숨을 고르다")
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.9))
                         .multilineTextAlignment(.center)

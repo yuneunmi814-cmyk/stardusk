@@ -57,7 +57,7 @@ struct SpotCurationView: View {
                     .frame(width: 40, height: 40).background(.white.opacity(0.14), in: Circle())
             }
             Spacer()
-            Text("내 주변, 어디로 갈까요?").font(.subheadline.weight(.semibold))
+            Text("지금, 어디로 도망칠까요?").font(.subheadline.weight(.medium))
                 .foregroundStyle(.white.opacity(0.9))
             Spacer()
             Color.clear.frame(width: 40, height: 40)
@@ -171,7 +171,7 @@ struct SpotCurationView: View {
         VStack(spacing: 16) {
             Image(systemName: "checkmark.seal.fill").font(.system(size: 54))
                 .foregroundStyle(Color.meadowAccent)
-            Text("주변 자연을 모두 둘러봤어요").font(.headline.weight(.medium)).foregroundStyle(.white)
+            Text("근처 쉼표를 모두 둘러봤어요").font(.headline.weight(.medium)).foregroundStyle(.white)
             Button { index = 0; drag = .zero } label: {
                 Label("처음부터 다시", systemImage: "arrow.clockwise")
                     .font(.subheadline.weight(.semibold)).foregroundStyle(.white)

@@ -107,7 +107,7 @@ struct SavedView: View {
             Image(systemName: "leaf.fill").font(.system(size: 50)).foregroundStyle(Color.meadow)
             Text("저장한 곳이 없어요").font(.headline.weight(.medium))
                 .foregroundStyle(Meadow.textPrimary(scheme))
-            Text("탐색에서 마음에 드는 자연을 라이크(♥)하면 여기에 모여요")
+            Text("마음이 머문 쉼표를 라이크(♥)하면 여기에 모여요")
                 .font(.subheadline).foregroundStyle(Meadow.textSecondary(scheme)).multilineTextAlignment(.center)
         }
         .padding(.horizontal, 32)
