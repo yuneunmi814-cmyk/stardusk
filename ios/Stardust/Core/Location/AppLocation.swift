@@ -17,6 +17,11 @@ final class AppLocation: NSObject, ObservableObject {
     /// 기본 카메라: 강원 강릉(서비스 주무대).
     static let gangneung = CLLocationCoordinate2D(latitude: 37.7519, longitude: 128.8761)
 
+    /// 한반도 범위(백엔드 수집 범위와 동일). 이 밖이면 데이터가 없으므로 기본 위치로 폴백.
+    static func isInKorea(_ c: CLLocationCoordinate2D) -> Bool {
+        (33.0...39.5).contains(c.latitude) && (124.0...132.0).contains(c.longitude)
+    }
+
     private let manager = CLLocationManager()
     private let geocoder = CLGeocoder()
 
@@ -33,10 +38,17 @@ final class AppLocation: NSObject, ObservableObject {
         if status == .notDetermined {
             manager.requestWhenInUseAuthorization()   // 권한 팝업
         } else if status == .denied || status == .restricted {
-            isConfirmed = true                         // 거부 시 기본값으로 진행
+            fallbackToDefault()                        // 거부 시 기본 위치(강릉)로 진행
         } else {
             manager.requestLocation()
         }
+    }
+
+    /// 위치를 못 얻거나 한국 밖일 때 — 데이터가 있는 기본 위치(강릉)로 확정.
+    private func fallbackToDefault() {
+        coordinate = AppLocation.gangneung
+        displayName = "강릉"
+        confirm()
     }
 
     /// 위치 설정 화면에서 좌표/이름을 갱신(미확정 상태 유지).
@@ -63,15 +75,20 @@ extension AppLocation: CLLocationManagerDelegate {
                                      didUpdateLocations locations: [CLLocation]) {
         guard let c = locations.last?.coordinate else { return }
         Task { @MainActor in
-            self.coordinate = c
-            self.reverseGeocode(c)
-            self.confirm()
+            if AppLocation.isInKorea(c) {
+                self.coordinate = c
+                self.reverseGeocode(c)
+                self.confirm()
+            } else {
+                // 한국 밖(예: 해외 심사 환경) → 데이터가 있는 기본 위치(강릉)로 폴백.
+                self.fallbackToDefault()
+            }
         }
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager,
                                      didFailWithError error: Error) {
-        Task { @MainActor in self.isConfirmed = true }   // 실패해도 기본값으로 진행
+        Task { @MainActor in self.fallbackToDefault() }   // 실패해도 기본 위치로 진행
     }
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
@@ -81,7 +98,7 @@ extension AppLocation: CLLocationManagerDelegate {
             case .authorizedWhenInUse, .authorizedAlways:
                 manager.requestLocation()
             case .denied, .restricted:
-                self.isConfirmed = true                  // 거부 시 기본값으로 진행
+                self.fallbackToDefault()                 // 거부 시 기본 위치(강릉)로 진행
             default:
                 break
             }
