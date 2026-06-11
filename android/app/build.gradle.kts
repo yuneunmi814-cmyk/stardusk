@@ -13,6 +13,11 @@ val localProps = Properties().apply {
 val mapsApiKey: String = (localProps.getProperty("MAPS_API_KEY") ?: "")
 val googleWebClientId: String = (localProps.getProperty("GOOGLE_WEB_CLIENT_ID") ?: "")
 
+// keystore.properties 가 있으면 릴리스 업로드 키로 서명(파일·비밀번호는 깃에 커밋 금지)
+val keystoreProps: Properties? = rootProject.file("keystore.properties").let { f ->
+    if (f.exists()) Properties().apply { f.inputStream().use { load(it) } } else null
+}
+
 android {
     namespace = "app.stardust.comma"
     compileSdk = 34
@@ -27,10 +32,22 @@ android {
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$googleWebClientId\"")
     }
 
+    signingConfigs {
+        if (keystoreProps != null) {
+            create("release") {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (keystoreProps != null) signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {

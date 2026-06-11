@@ -35,7 +35,7 @@ KT="/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/keytool"
 # → 키스토어 비밀번호, 키 비밀번호, 이름/조직 입력 (직접 입력하세요)
 ```
 
-`android/keystore.properties` 생성(이 파일도 git 미추적 — 아래 4번에서 제외 처리):
+`android/keystore.properties` 생성(이 파일도 git 미추적 — `.gitignore`에 제외됨):
 ```properties
 storeFile=/Users/<you>/comma-release.jks
 storePassword=<키스토어 비밀번호>
@@ -43,27 +43,8 @@ keyAlias=comma
 keyPassword=<키 비밀번호>
 ```
 
-### build.gradle.kts 서명 설정(아직 없다면 추가)
-`android/app/build.gradle.kts`의 `android { }` 안에:
-```kotlin
-val keystoreProps = rootProject.file("keystore.properties").let { f ->
-    if (f.exists()) java.util.Properties().apply { f.inputStream().use { load(it) } } else null
-}
-signingConfigs {
-    if (keystoreProps != null) create("release") {
-        storeFile = file(keystoreProps.getProperty("storeFile"))
-        storePassword = keystoreProps.getProperty("storePassword")
-        keyAlias = keystoreProps.getProperty("keyAlias")
-        keyPassword = keystoreProps.getProperty("keyPassword")
-    }
-}
-buildTypes {
-    release {
-        isMinifyEnabled = false
-        if (keystoreProps != null) signingConfig = signingConfigs.getByName("release")
-    }
-}
-```
+### build.gradle.kts 서명 설정 — ✅ 적용 완료
+`android/app/build.gradle.kts`에 이미 들어 있습니다. `keystore.properties`가 **있으면** 릴리스 빌드가 자동으로 업로드 키로 서명되고, 없으면 서명 없이 빌드됩니다(별도 수정 불필요).
 
 > **Play 앱 서명(권장):** 위 키는 *업로드 키*가 되고, Play가 최종 배포 서명을 관리합니다.
 > 업로드 후 Play Console → **설정 → 앱 무결성**에서 Google이 관리하는 **앱 서명 인증서의 SHA-1**을 확인해
