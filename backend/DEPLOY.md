@@ -36,6 +36,7 @@
 | `SUPABASE_SERVICE_ROLE_KEY` | service_role key (**서버 전용**) |
 | `SUPABASE_STORAGE_BUCKET` | `sky` |
 | `KTO_SERVICE_KEY` | 한국관광공사 OpenAPI 서비스 키 |
+| `TMAP_APP_KEY` | TMAP(SK open API) 앱 키 — 도보안내 실경로용. 미설정 시 직선 폴백 |
 | `CORS_ORIGINS` | `*` (앱 전용이면 무방) |
 
 > `APP_ENV=production`, `DEBUG=false`, `RUN_MIGRATIONS=1`, `WEB_CONCURRENCY=2` 는

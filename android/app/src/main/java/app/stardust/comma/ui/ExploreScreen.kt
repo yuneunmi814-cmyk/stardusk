@@ -26,18 +26,23 @@ import androidx.compose.ui.geometry.Offset
 import androidx.core.content.ContextCompat
 import app.stardust.comma.data.Session
 import app.stardust.comma.data.TourSpot
+import app.stardust.comma.data.WalkRoute
 import kotlinx.coroutines.launch
 import app.stardust.comma.ui.theme.MeadowAccent
+import app.stardust.comma.ui.theme.MeadowDeep
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.MapsInitializer
 import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 
 private val GANGNEUNG = LatLng(37.7519, 128.8761)
@@ -79,7 +84,35 @@ fun ExploreScreen(modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
     var showCuration by remember { mutableStateOf(false) }
     var deck by remember { mutableStateOf<List<TourSpot>>(emptyList()) }
+    // 도보안내 모드 — 길찾기 탭 시 backend /tour/walk-route 경로를 지도에 올린다.
+    var walkTarget by remember { mutableStateOf<TourSpot?>(null) }
+    var walkRoute by remember { mutableStateOf<WalkRoute?>(null) }
     val cam = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(GANGNEUNG, 11f) }
+
+    // 경로 수신 → 출발·도착이 모두 보이게 카메라 맞춤
+    LaunchedEffect(walkRoute) {
+        val r = walkRoute ?: return@LaunchedEffect
+        if (r.path.size < 2) return@LaunchedEffect
+        val bounds = LatLngBounds.builder()
+            .apply { r.path.forEach { include(LatLng(it.lat, it.lng)) } }
+            .build()
+        runCatching { cam.animate(CameraUpdateFactory.newLatLngBounds(bounds, 140)) }
+    }
+
+    /** 도보안내 시작 — 실패(해외 좌표·네트워크 등)하면 외부 지도앱으로 안전망 핸드오프. */
+    fun startWalkGuidance(spot: TourSpot) {
+        scope.launch {
+            runCatching {
+                Session.ensureGuest()
+                Session.api.walkRoute(center.latitude, center.longitude, spot.latitude, spot.longitude).data
+            }.onSuccess { route ->
+                walkTarget = spot
+                walkRoute = route
+            }.onFailure {
+                openExternalWalkNav(ctx, spot)
+            }
+        }
+    }
 
     val fused = remember { LocationServices.getFusedLocationProviderClient(ctx) }
     // BitmapDescriptorFactory는 Maps 초기화 후에만 사용 가능 → 먼저 초기화.
@@ -145,6 +178,22 @@ fun ExploreScreen(modifier: Modifier = Modifier) {
                     anchor = Offset(0.5f, 0.5f),     // 좌표 정중앙에 점이 오도록
                 )
             }
+            // 도보안내 — 경로 폴리라인 + 목적지 핀
+            walkRoute?.let { r ->
+                Polyline(
+                    points = r.path.map { LatLng(it.lat, it.lng) },
+                    color = MeadowDeep,
+                    width = 12f,
+                    geodesic = true,
+                )
+            }
+            walkTarget?.let { t ->
+                Marker(
+                    state = MarkerState(LatLng(t.latitude, t.longitude)),
+                    title = t.spotName,
+                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN),
+                )
+            }
         }
 
         if (loading) {
@@ -163,23 +212,34 @@ fun ExploreScreen(modifier: Modifier = Modifier) {
             ) { Text("이 지역은 아직 준비 중이에요", Modifier.padding(16.dp)) }
         }
 
-        // CTA — 다시 가까운 자연 불러오기(추후 큐레이션 카드로 확장)
-        Button(
-            onClick = {
-                scope.launch {
-                    Session.ensureGuest()
-                    val d = runCatching { Session.api.deck(center.latitude, center.longitude).data }.getOrDefault(emptyList())
-                    deck = d.ifEmpty { spots }
-                    if (deck.isNotEmpty()) showCuration = true
-                }
-            },
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 20.dp).height(54.dp),
-            shape = RoundedCornerShape(27.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MeadowAccent, contentColor = Color.White),
-        ) {
-            Icon(Icons.Filled.Search, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text("지금, 가까운 쉼표로", fontWeight = FontWeight.Medium)
+        // 하단 — 도보안내 중엔 안내 카드, 평소엔 큐레이션 CTA
+        val target = walkTarget
+        val route = walkRoute
+        if (target != null && route != null) {
+            WalkGuidanceCard(
+                spot = target,
+                route = route,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = 14.dp, vertical = 14.dp),
+                onClose = { walkTarget = null; walkRoute = null },
+            )
+        } else {
+            Button(
+                onClick = {
+                    scope.launch {
+                        Session.ensureGuest()
+                        val d = runCatching { Session.api.deck(center.latitude, center.longitude).data }.getOrDefault(emptyList())
+                        deck = d.ifEmpty { spots }
+                        if (deck.isNotEmpty()) showCuration = true
+                    }
+                },
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 20.dp).height(54.dp),
+                shape = RoundedCornerShape(27.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MeadowAccent, contentColor = Color.White),
+            ) {
+                Icon(Icons.Filled.Search, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("지금, 가까운 쉼표로", fontWeight = FontWeight.Medium)
+            }
         }
     }
 
@@ -189,7 +249,14 @@ fun ExploreScreen(modifier: Modifier = Modifier) {
             onDismissRequest = { showCuration = false },
             properties = DialogProperties(usePlatformDefaultWidth = false),
         ) {
-            CurationOverlay(spots = deck, onClose = { showCuration = false })
+            CurationOverlay(
+                spots = deck,
+                onClose = { showCuration = false },
+                onNavigate = { spot ->
+                    showCuration = false           // 오버레이 닫고 지도 위에서 도보안내
+                    startWalkGuidance(spot)
+                },
+            )
         }
     }
 }

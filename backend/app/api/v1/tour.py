@@ -26,9 +26,12 @@ from app.schemas.tour import (
     TourSearchResponse,
     TourSpotOut,
     TourSpotsResponse,
+    WalkRouteData,
+    WalkRouteResponse,
 )
 from app.services import taste as taste_service
 from app.services.tour_sync import fetch_overview
+from app.services.walk_route import fetch_walk_route
 
 router = APIRouter(prefix="/tour", tags=["tour"])
 
@@ -183,6 +186,25 @@ async def unsave_spot(
     await session.commit()
     rows = (await session.execute(_SAVED_SQL, {"uid": user["user_id"]})).mappings().all()
     return TourSpotsResponse(data=[_row_to_spot(r, with_distance=False) for r in rows])
+
+
+@router.get("/walk-route", response_model=WalkRouteResponse, summary="도보 경로 안내(길찾기)")
+async def get_walk_route(
+    from_lat: float = Query(..., description="출발 위도(현재 위치)"),
+    from_lng: float = Query(..., description="출발 경도"),
+    to_lat: float = Query(..., description="도착 위도(명소)"),
+    to_lng: float = Query(..., description="도착 경도"),
+    _user: dict = Depends(get_current_user),
+) -> WalkRouteResponse:
+    """현재 위치 → 명소 도보 경로(폴리라인 + 회전지점 안내문 + 거리/시간).
+
+    TMAP 보행자 경로 API(서버 키)로 실경로를 받고, 키 미설정/실패 시
+    출발→도착 직선 1구간으로 폴백한다(source="straight"). 한국 밖 좌표는
+    400 — 클라이언트는 외부 지도앱 핸드오프로 대체한다."""
+    ensure_korea_coords(from_lat, from_lng)
+    ensure_korea_coords(to_lat, to_lng)
+    route = await fetch_walk_route(from_lat, from_lng, to_lat, to_lng)
+    return WalkRouteResponse(data=WalkRouteData(**route))
 
 
 @router.get("/{content_id}/detail", response_model=SpotDetailResponse, summary="명소 상세설명(도슨트)")
