@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -87,7 +88,14 @@ fun ExploreScreen(modifier: Modifier = Modifier) {
     // 도보안내 모드 — 길찾기 탭 시 backend /tour/walk-route 경로를 지도에 올린다.
     var walkTarget by remember { mutableStateOf<TourSpot?>(null) }
     var walkRoute by remember { mutableStateOf<WalkRoute?>(null) }
+    // 위치 설정(iOS LocationSetupView 동등) + 경로 실패 시 길안내 앱 선택 폴백
+    var showLocationSetup by remember { mutableStateOf(false) }
+    var placeName by remember { mutableStateOf("현위치") }
+    var navFallbackSpot by remember { mutableStateOf<TourSpot?>(null) }
     val cam = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(GANGNEUNG, 11f) }
+
+    // 중심이 바뀔 때마다 위치 칩의 동네명 갱신
+    LaunchedEffect(center) { placeName = reversePlaceName(ctx, center) }
 
     // 경로 수신 → 출발·도착이 모두 보이게 카메라 맞춤
     LaunchedEffect(walkRoute) {
@@ -109,7 +117,7 @@ fun ExploreScreen(modifier: Modifier = Modifier) {
                 walkTarget = spot
                 walkRoute = route
             }.onFailure {
-                openExternalWalkNav(ctx, spot)
+                navFallbackSpot = spot       // 경로 실패(해외 좌표 등) → 길안내 앱 선택으로 안전망
             }
         }
     }
@@ -196,6 +204,26 @@ fun ExploreScreen(modifier: Modifier = Modifier) {
             }
         }
 
+        // 좌상단 위치 칩 — 동네명 + 변경(iOS ExploreView 동등)
+        Surface(
+            onClick = { showLocationSetup = true },
+            shape = RoundedCornerShape(20.dp),
+            tonalElevation = 2.dp,
+            shadowElevation = 4.dp,
+            modifier = Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 12.dp),
+        ) {
+            Row(
+                Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Filled.Place, contentDescription = null, tint = MeadowDeep, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(placeName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1)
+                Spacer(Modifier.width(8.dp))
+                Text("변경", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium, color = MeadowDeep)
+            }
+        }
+
         if (loading) {
             CircularProgressIndicator(
                 Modifier.align(Alignment.TopCenter).padding(top = 12.dp),
@@ -241,6 +269,31 @@ fun ExploreScreen(modifier: Modifier = Modifier) {
                 Text("지금, 가까운 쉼표로", fontWeight = FontWeight.Medium)
             }
         }
+    }
+
+    // 위치 설정 — 풀스크린(지도 중앙 핀 + 검색 + 해당 위치로 시작하기)
+    if (showLocationSetup) {
+        Dialog(
+            onDismissRequest = { showLocationSetup = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            LocationSetupScreen(
+                initial = center,
+                onConfirm = { picked, name ->
+                    showLocationSetup = false
+                    walkTarget = null; walkRoute = null   // 지역 변경 시 진행 중 도보안내 종료
+                    placeName = name
+                    center = picked
+                    reload += 1                           // 동일 좌표 재선택이어도 재검색
+                },
+                onClose = { showLocationSetup = false },
+            )
+        }
+    }
+
+    // 경로 실패 폴백 — iOS와 동일한 "길안내 앱 선택"
+    navFallbackSpot?.let { spot ->
+        MapAppChooserSheet(spot = spot, onDismiss = { navFallbackSpot = null })
     }
 
     // 큐레이션 카드 덱(진짜 풀스크린 오버레이 — 하단 내비게이션 바까지 덮어 라이크/패스 버튼 노출)

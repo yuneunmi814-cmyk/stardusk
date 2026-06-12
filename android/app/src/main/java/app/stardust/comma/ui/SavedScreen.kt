@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,6 +28,7 @@ fun SavedScreen(modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
     var spots by remember { mutableStateOf<List<TourSpot>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
+    var navSpot by remember { mutableStateOf<TourSpot?>(null) }   // 길안내 앱 선택 대상
 
     suspend fun load() {
         loading = true
@@ -46,20 +48,27 @@ fun SavedScreen(modifier: Modifier = Modifier) {
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(spots, key = { it.tourId }) { s ->
-                        SavedRow(s, onUnsave = {
-                            scope.launch {
-                                spots = try { Session.api.unsave(s.tourId).data } catch (e: Exception) { spots }
-                            }
-                        })
+                        SavedRow(
+                            s,
+                            onNavigate = { navSpot = s },
+                            onUnsave = {
+                                scope.launch {
+                                    spots = try { Session.api.unsave(s.tourId).data } catch (e: Exception) { spots }
+                                }
+                            },
+                        )
                     }
                 }
             }
         }
     }
+
+    // iOS SavedView와 동일한 "길안내 앱 선택"
+    navSpot?.let { MapAppChooserSheet(spot = it, onDismiss = { navSpot = null }) }
 }
 
 @Composable
-private fun SavedRow(s: TourSpot, onUnsave: () -> Unit) {
+private fun SavedRow(s: TourSpot, onNavigate: () -> Unit, onUnsave: () -> Unit) {
     Surface(shape = RoundedCornerShape(20.dp), tonalElevation = 1.dp) {
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             AsyncImage(
@@ -73,6 +82,9 @@ private fun SavedRow(s: TourSpot, onUnsave: () -> Unit) {
                 (s.address ?: s.region)?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 1)
                 }
+            }
+            IconButton(onClick = onNavigate) {
+                Icon(Icons.Filled.NearMe, contentDescription = "길찾기", tint = MeadowDeep)
             }
             IconButton(onClick = onUnsave) {
                 Icon(Icons.Filled.Favorite, contentDescription = "저장 해제", tint = MeadowDeep)
