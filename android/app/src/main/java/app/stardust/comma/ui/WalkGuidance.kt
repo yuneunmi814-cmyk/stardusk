@@ -1,8 +1,5 @@
 package app.stardust.comma.ui
 
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -12,6 +9,7 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Straight
 import androidx.compose.material.icons.filled.TurnLeft
 import androidx.compose.material.icons.filled.TurnRight
@@ -29,29 +27,18 @@ import app.stardust.comma.data.WalkRoute
 import app.stardust.comma.ui.theme.*
 import java.util.Locale
 
-/** 외부 지도앱 도보 길안내 — 네이버지도 도보 모드 우선, 미설치 시 geo: 폴백(iOS ExternalMap과 동일한 우선순위 철학). */
-fun openExternalWalkNav(ctx: Context, spot: TourSpot) {
-    val name = Uri.encode(spot.spotName)
-    val naver = Uri.parse(
-        "nmap://route/walk?dlat=${spot.latitude}&dlng=${spot.longitude}&dname=$name&appname=app.stardust.comma"
-    )
-    val opened = runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, naver)) }.isSuccess
-    if (!opened) {
-        val geo = Uri.parse("geo:${spot.latitude},${spot.longitude}?q=${Uri.encode(spot.spotName)}")
-        runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, geo)) }
-    }
-}
-
 /** 지도 하단 도보안내 카드 — 총거리/도보시간 + 회전지점 안내문 넘겨보기 + TTS + 외부앱 안전망. */
 @Composable
 fun WalkGuidanceCard(
     spot: TourSpot,
     route: WalkRoute,
     modifier: Modifier = Modifier,
+    arrived: Boolean = false,
     onClose: () -> Unit,
 ) {
-    val ctx = LocalContext.current
     var stepIndex by remember(route) { mutableIntStateOf(0) }
+    var showAppChooser by remember { mutableStateOf(false) }
+    val ctx = LocalContext.current
 
     val dark = isSystemInDarkTheme()
     val surface = if (dark) MeadowSurfaceDark else MeadowSurface
@@ -70,6 +57,16 @@ fun WalkGuidanceCard(
 
     val step = route.steps.getOrNull(stepIndex)
     val summary = "${spot.spotName}까지 ${route.totalText}, 도보 ${route.etaMin}분"
+
+    // 도착 시 1회 음성 안내(iOS 도착 알림의 음성판)
+    LaunchedEffect(arrived) {
+        if (arrived) {
+            tts.value?.speak(
+                "목적지에 도착했어요. 잠시 멈추어, 숨을 고르세요.",
+                TextToSpeech.QUEUE_FLUSH, null, "arrived_${spot.tourId}",
+            )
+        }
+    }
 
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -99,7 +96,20 @@ fun WalkGuidanceCard(
                 }
             }
 
-            if (step != null) {
+            if (arrived) {
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Place, contentDescription = null, tint = MeadowAccent, modifier = Modifier.size(28.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        "✨ 도착했어요 — 잠시 멈추어, 숨을 고르세요",
+                        color = textPrimary,
+                        fontWeight = FontWeight.Medium,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            } else if (step != null) {
                 Spacer(Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val turnIcon = when (step.turn) {
@@ -141,10 +151,15 @@ fun WalkGuidanceCard(
                     tts.value?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "walk_${spot.tourId}")
                 }
                 GuideChip("외부 지도앱", Icons.Filled.Map, Modifier.weight(1f)) {
-                    openExternalWalkNav(ctx, spot)
+                    showAppChooser = true
                 }
             }
         }
+    }
+
+    // iOS와 동일한 "길안내 앱 선택" — 설치된 지도앱(네이버/카카오/티맵) + 폴백
+    if (showAppChooser) {
+        MapAppChooserSheet(spot = spot, onDismiss = { showAppChooser = false })
     }
 }
 
