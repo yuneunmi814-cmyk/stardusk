@@ -226,3 +226,14 @@ backend/_local_storage/
 
 # iOS 로컬 시크릿(네이버 등) — 커밋 금지
 ios/Config/Secrets.xcconfig
+
+# Android 로컬 시크릿·서명 키 — 커밋 금지
+android/local.properties
+android/keystore.properties
+*.jks
+*.keystore
+
+# Android 빌드 산출물
+android/.gradle/
+android/app/build/
+android/build/

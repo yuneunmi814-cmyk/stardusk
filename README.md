@@ -3,7 +3,7 @@
 > **잠시 멈추어, 숨을 고르다.**
 >
 > 복잡한 계획도 검색도 없이, 지금 내 위치에서 가장 가까운 **고요한 자연**으로
-> 한 번에 안내하는 힐링 여행 iOS 앱.
+> 한 번에 안내하는 힐링 여행 앱 (**iOS · Android**).
 
 **2026 관광데이터 활용 공모전 — 웹·앱 개발 부문** 출품작
 
@@ -35,6 +35,7 @@
 ## 🏗 기술 스택
 
 - **iOS:** SwiftUI · MapKit · CoreLocation · AVSpeechSynthesizer(TTS), iOS 17+
+- **Android:** Jetpack Compose · Google Maps Compose · Credential Manager(Google 로그인) · TTS, Android 8+(API 26)
 - **Backend:** FastAPI(Python 3.11) · SQLAlchemy · Alembic · asyncpg
 - **DB:** Supabase — PostgreSQL + **PostGIS**(ST_DWithin/ST_Distance 반경 조회)
 - **인증:** Apple/Google → 서버 JWKS 검증 → 내부 JWT(iOS Keychain). 게스트=익명 토큰
@@ -51,6 +52,9 @@
 │       ├── Theme/               # MeadowTheme (초원 디자인 토큰)
 │       ├── Features/Explore/    # 탐색 지도 · 큐레이션 · 저장 · 위치설정
 │       └── Features/Navigation/ # 외부 지도 핸드오프 등
+├── android/                     # Jetpack Compose 앱 (동일 백엔드 재사용)
+│   ├── app/src/main/java/       # ui(로그인·탐색·큐레이션·저장·설정) · data(API·세션)
+│   └── screenshots/             # Play 등록용 스크린샷 · 아이콘 · 피처 그래픽
 ├── backend/                     # FastAPI 백엔드
 │   ├── app/api/v1/              # auth · tour
 │   ├── app/services/            # taste(취향) · tour_sync(KTO 수집)
@@ -85,6 +89,15 @@ xcodegen generate               # project.yml → Stardust.xcodeproj
 open Stardust.xcodeproj          # Xcode 15+ / iOS 17 SDK
 ```
 Debug 빌드는 운영 호스트(`ios/Config/*.xcconfig`)를 바라봅니다.
+
+### Android
+```bash
+cd android
+# local.properties 작성(git 미추적): sdk.dir · MAPS_API_KEY · GOOGLE_WEB_CLIENT_ID
+export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+./gradlew :app:assembleDebug    # 디버그 APK
+```
+릴리스(.aab) 빌드·서명·Play 등록은 [`docs/PLAY_STORE_GUIDE.md`](./docs/PLAY_STORE_GUIDE.md) 참고.
 
 ## 🔑 환경변수 (`backend/.env`)
 
