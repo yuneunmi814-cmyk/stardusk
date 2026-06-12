@@ -31,7 +31,9 @@ import app.stardust.comma.data.WalkRoute
 import kotlinx.coroutines.launch
 import app.stardust.comma.ui.theme.MeadowAccent
 import app.stardust.comma.ui.theme.MeadowDeep
+import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.MapsInitializer
 import com.google.android.gms.maps.model.BitmapDescriptor
@@ -45,9 +47,21 @@ import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 
 private val GANGNEUNG = LatLng(37.7519, 128.8761)
 private fun inKorea(p: LatLng) = p.latitude in 33.0..39.5 && p.longitude in 124.0..132.0
+
+/** 일회성 현재 위치 — play-services Task를 의존성 추가 없이 suspend로 감싼다(실패 시 null). */
+@SuppressLint("MissingPermission")
+private suspend fun currentLocation(fused: FusedLocationProviderClient): android.location.Location? =
+    suspendCancellableCoroutine { cont ->
+        fused.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+            .addOnSuccessListener { if (cont.isActive) cont.resume(it) }
+            .addOnFailureListener { if (cont.isActive) cont.resume(null) }
+    }
 
 /** iOS StarDot과 동일한 초원 점 마커: 은은한 헤일로 + 흰 점 + meadowDeep 링. */
 private fun meadowDotIcon(density: Float): BitmapDescriptor {
@@ -92,10 +106,32 @@ fun ExploreScreen(modifier: Modifier = Modifier) {
     var showLocationSetup by remember { mutableStateOf(false) }
     var placeName by remember { mutableStateOf("현위치") }
     var navFallbackSpot by remember { mutableStateOf<TourSpot?>(null) }
+    var arrived by remember { mutableStateOf(false) }   // 도보안내 도착 여부(목적지 40m 이내)
     val cam = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(GANGNEUNG, 11f) }
+    val fused = remember { LocationServices.getFusedLocationProviderClient(ctx) }
 
     // 중심이 바뀔 때마다 위치 칩의 동네명 갱신
     LaunchedEffect(center) { placeName = reversePlaceName(ctx, center) }
+
+    // 도보안내 도착 감지(iOS ArrivalGeofence의 정책-안전판) — 안내가 떠 있는 동안만
+    // 주기 확인(백그라운드 추적·추가 권한 없음). 목적지 40m 이내 진입 시 1회 도착 처리.
+    LaunchedEffect(walkTarget) {
+        arrived = false
+        val target = walkTarget ?: return@LaunchedEffect
+        val granted = ContextCompat.checkSelfPermission(ctx, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!granted) return@LaunchedEffect
+        while (!arrived) {
+            currentLocation(fused)?.let { loc ->
+                val d = FloatArray(1)
+                android.location.Location.distanceBetween(
+                    loc.latitude, loc.longitude, target.latitude, target.longitude, d
+                )
+                if (d[0] <= 40f) arrived = true
+            }
+            if (!arrived) delay(7_000)
+        }
+    }
 
     // 경로 수신 → 출발·도착이 모두 보이게 카메라 맞춤
     LaunchedEffect(walkRoute) {
@@ -122,7 +158,6 @@ fun ExploreScreen(modifier: Modifier = Modifier) {
         }
     }
 
-    val fused = remember { LocationServices.getFusedLocationProviderClient(ctx) }
     // BitmapDescriptorFactory는 Maps 초기화 후에만 사용 가능 → 먼저 초기화.
     val dotIcon = remember {
         @Suppress("DEPRECATION")
@@ -247,6 +282,7 @@ fun ExploreScreen(modifier: Modifier = Modifier) {
             WalkGuidanceCard(
                 spot = target,
                 route = route,
+                arrived = arrived,
                 modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = 14.dp, vertical = 14.dp),
                 onClose = { walkTarget = null; walkRoute = null },
             )

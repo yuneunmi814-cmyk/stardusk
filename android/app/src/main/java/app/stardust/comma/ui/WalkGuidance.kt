@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Straight
 import androidx.compose.material.icons.filled.TurnLeft
 import androidx.compose.material.icons.filled.TurnRight
@@ -32,6 +33,7 @@ fun WalkGuidanceCard(
     spot: TourSpot,
     route: WalkRoute,
     modifier: Modifier = Modifier,
+    arrived: Boolean = false,
     onClose: () -> Unit,
 ) {
     var stepIndex by remember(route) { mutableIntStateOf(0) }
@@ -55,6 +57,16 @@ fun WalkGuidanceCard(
 
     val step = route.steps.getOrNull(stepIndex)
     val summary = "${spot.spotName}까지 ${route.totalText}, 도보 ${route.etaMin}분"
+
+    // 도착 시 1회 음성 안내(iOS 도착 알림의 음성판)
+    LaunchedEffect(arrived) {
+        if (arrived) {
+            tts.value?.speak(
+                "목적지에 도착했어요. 잠시 멈추어, 숨을 고르세요.",
+                TextToSpeech.QUEUE_FLUSH, null, "arrived_${spot.tourId}",
+            )
+        }
+    }
 
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -84,7 +96,20 @@ fun WalkGuidanceCard(
                 }
             }
 
-            if (step != null) {
+            if (arrived) {
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Place, contentDescription = null, tint = MeadowAccent, modifier = Modifier.size(28.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        "✨ 도착했어요 — 잠시 멈추어, 숨을 고르세요",
+                        color = textPrimary,
+                        fontWeight = FontWeight.Medium,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            } else if (step != null) {
                 Spacer(Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     val turnIcon = when (step.turn) {
