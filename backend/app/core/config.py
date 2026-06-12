@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     KTO_BASE_URL: str = "https://apis.data.go.kr/B551011/KorService2"
     KTO_DEFAULT_AREA_CODE: str = "32" # 강원도 (지역 특화)
 
+    # --- TMAP(SK 오픈 API) 보행자 경로 — 도보안내(서버 전용) ---
+    TMAP_APP_KEY: str = ""            # 미설정이면 길찾기는 직선 폴백으로 동작
+
     @property
     def cors_origin_list(self) -> list[str]:
         if self.CORS_ORIGINS.strip() == "*":

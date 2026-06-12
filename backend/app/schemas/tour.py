@@ -76,3 +76,30 @@ class SwipeData(BaseModel):
 class SwipeResponse(BaseModel):
     status: str = "success"
     data: SwipeData
+
+
+# ---- 도보 안내 (길찾기 → 도보안내) ----
+class WalkStepOut(BaseModel):
+    lat: float
+    lng: float
+    distance_m: int = Field(..., description="직전 지점부터 이 지점까지 구간 거리(m)")
+    turn: str = Field(..., description="left | right | straight")
+    instruction: str = Field(..., description="한국어 안내문(TMAP description)")
+
+
+class WalkPointOut(BaseModel):
+    lat: float
+    lng: float
+
+
+class WalkRouteData(BaseModel):
+    source: str = Field(..., description="tmap(실경로) | straight(직선 폴백)")
+    total_m: int = Field(..., description="총 도보 거리(m)")
+    eta_min: int = Field(..., description="예상 도보 시간(분)")
+    path: list[WalkPointOut] = Field(..., description="지도 폴리라인 좌표열")
+    steps: list[WalkStepOut] = Field(..., description="회전지점별 안내 단계")
+
+
+class WalkRouteResponse(BaseModel):
+    status: str = "success"
+    data: WalkRouteData

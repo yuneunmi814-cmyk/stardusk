@@ -64,6 +64,31 @@ data class SpotDetail(
     val overview: String?,
 )
 
+// ── 도보안내(길찾기) ─────────────────────────────────────
+@JsonClass(generateAdapter = true)
+data class WalkPoint(val lat: Double, val lng: Double)
+
+@JsonClass(generateAdapter = true)
+data class WalkStep(
+    val lat: Double,
+    val lng: Double,
+    @Json(name = "distance_m") val distanceM: Int,
+    val turn: String,            // left | right | straight
+    val instruction: String,     // 한국어 안내문
+)
+
+@JsonClass(generateAdapter = true)
+data class WalkRoute(
+    val source: String,          // tmap(실경로) | straight(직선 폴백)
+    @Json(name = "total_m") val totalM: Int,
+    @Json(name = "eta_min") val etaMin: Int,
+    val path: List<WalkPoint>,
+    val steps: List<WalkStep>,
+) {
+    val totalText: String
+        get() = if (totalM >= 1000) String.format("%.1fkm", totalM / 1000.0) else "${totalM}m"
+}
+
 interface CommaApi {
     @POST("auth/guest")
     suspend fun guest(): Envelope<AuthData>
@@ -98,6 +123,14 @@ interface CommaApi {
 
     @GET("tour/{id}/detail")
     suspend fun detail(@Path("id") id: String): Envelope<SpotDetail>
+
+    @GET("tour/walk-route")
+    suspend fun walkRoute(
+        @Query("from_lat") fromLat: Double,
+        @Query("from_lng") fromLng: Double,
+        @Query("to_lat") toLat: Double,
+        @Query("to_lng") toLng: Double,
+    ): Envelope<WalkRoute>
 
     @DELETE("auth/me")
     suspend fun deleteAccount(): retrofit2.Response<Unit>

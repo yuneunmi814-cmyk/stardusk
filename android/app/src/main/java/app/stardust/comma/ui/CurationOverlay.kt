@@ -1,7 +1,5 @@
 package app.stardust.comma.ui
 
-import android.content.Intent
-import android.net.Uri
 import android.speech.tts.TextToSpeech
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -34,9 +32,10 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.roundToInt
 
-/** iOS 큐레이션 카드와 동일한 스와이프 덱(라이크/패스 + 길찾기 + 안내 듣기). */
+/** iOS 큐레이션 카드와 동일한 스와이프 덱(라이크/패스 + 길찾기 + 안내 듣기).
+ *  길찾기는 호출측(ExploreScreen)이 받아 지도 위 도보안내로 전환한다. */
 @Composable
-fun CurationOverlay(spots: List<TourSpot>, onClose: () -> Unit) {
+fun CurationOverlay(spots: List<TourSpot>, onClose: () -> Unit, onNavigate: (TourSpot) -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var index by remember { mutableIntStateOf(0) }
@@ -95,8 +94,8 @@ fun CurationOverlay(spots: List<TourSpot>, onClose: () -> Unit) {
                         ) { _, drag -> dragX += drag }
                     },
                     onNavigate = {
-                        val uri = Uri.parse("geo:${spot.latitude},${spot.longitude}?q=${Uri.encode(spot.spotName)}")
-                        runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+                        tts.value?.stop()
+                        onNavigate(spot)
                     },
                     onSpeak = {
                         scope.launch {
