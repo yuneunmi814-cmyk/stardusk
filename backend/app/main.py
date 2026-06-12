@@ -108,7 +108,21 @@ app.include_router(galaxy_community.router, prefix=settings.API_V1_PREFIX)  # Ph
 # --- 헬스체크 ---
 @app.get("/health", tags=["system"], summary="헬스체크")
 async def health() -> dict:
-    return {"status": "ok", "app": settings.APP_NAME, "env": settings.APP_ENV}
+    """가벼운 DB 핑(SELECT 1) 포함 — keepalive 워크플로가 이 엔드포인트만 쳐도
+    Render(웹)와 Supabase(DB, 무료 플랜 1주 미사용 시 일시정지) 둘 다 깨어 있게 한다.
+    DB가 죽어도 200을 유지(payload의 db로 보고) — Render 헬스체크가 재시작 루프를
+    돌지 않도록."""
+    db = "ok"
+    try:
+        from sqlalchemy import text as sa_text
+
+        from app.db.session import AsyncSessionLocal
+
+        async with AsyncSessionLocal() as session:
+            await asyncio.wait_for(session.execute(sa_text("SELECT 1")), timeout=5.0)
+    except Exception:  # noqa: BLE001 — 헬스체크는 어떤 DB 장애에도 200 유지
+        db = "unreachable"
+    return {"status": "ok", "app": settings.APP_NAME, "env": settings.APP_ENV, "db": db}
 
 
 @app.get("/", tags=["system"], summary="루트")
